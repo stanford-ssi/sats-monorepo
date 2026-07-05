@@ -1,0 +1,15 @@
+"""
+Root build for all embedded software
+"""
+
+package(default_visibility = ["//visibility:public"])
+
+# ============================================================================
+# Example Blink Target
+# ============================================================================
+
+cc_binary(
+    name = "blink",
+    src = "apps/blink/src/main.cc",
+)
+
