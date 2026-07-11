@@ -1,0 +1,13 @@
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@nanopb//extra/bazel:nanopb_cc_proto_library.bzl", "cc_nanopb_proto_library")
+
+proto_library(
+    name = "sats_command_proto",
+    srcs = ["sats_command.proto"],
+)
+
+cc_nanopb_proto_library(
+    name = "sats_command_nanopb",
+    protos = [":sats_command_proto"],
+    visibility = ["//visibility:public"],
+)

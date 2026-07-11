@@ -8,3 +8,5 @@ build:uf2 --output_groups=+pico_uf2_files
 # Debug
 build:debug --compilation_mode=dbg
 build:debug --strip=never
+
+build --noincompatible_disallow_ctx_resolve_tools

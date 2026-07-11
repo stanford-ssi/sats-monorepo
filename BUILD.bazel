@@ -32,6 +32,7 @@ cc_binary(
     copts = EMBEDDED_WARNING_COPTS,
     deps = [
         ":blink_lib",
+        "//common/proto:sats_command_nanopb",
         "@pico-sdk//src/rp2_common/pico_stdlib",
     ],
 )
