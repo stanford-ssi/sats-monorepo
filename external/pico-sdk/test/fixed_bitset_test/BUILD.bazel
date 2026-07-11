@@ -1,7 +1,0 @@
-# TODO: Add these tests to the Bazel build.
-filegroup(
-    name = "unsupported_tests",
-    srcs = [
-        "fixed_bitset_test.c",
-    ],
-)
