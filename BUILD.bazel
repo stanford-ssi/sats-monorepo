@@ -8,8 +8,13 @@ package(default_visibility = ["//visibility:public"])
 # Example Blink Target
 # ============================================================================
 
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
 cc_binary(
     name = "blink",
-    src = "apps/blink/src/main.cc",
+    srcs = ["apps/blink/src/main.cc"],
+    deps = [
+        "@pico-sdk//src/rp2_common/pico_stdlib",
+    ],
 )
 

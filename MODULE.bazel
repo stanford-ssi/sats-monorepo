@@ -1,0 +1,22 @@
+"""
+Module definition for Stanford Student Space Initiative's Monorepo
+"""
+
+module(
+    name = "sats_has_mono",
+    version = "0.0.1",
+)
+
+# Platform definitions for cross-compilation
+bazel_dep(name = "rules_cc", version = "0.2.17")
+
+# Pico SDK with native Bazel support from Bazel Central Registry
+bazel_dep(name = "pico-sdk", version = "2.3.0")
+
+# Register pico-sdk toolchains for macOS (both Intel and Apple Silicon)
+register_toolchains(
+    "@pico-sdk//bazel/toolchain:mac-aarch64-rp2350",
+    "@pico-sdk//bazel/toolchain:mac-x86_64-rp2350",
+    "@pico-sdk//bazel/toolchain:linux-aarch64-rp2350",
+    "@pico-sdk//bazel/toolchain:linux-x86_64-rp2350",
+)
