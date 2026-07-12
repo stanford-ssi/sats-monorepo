@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library")
+
+rust_static_library(
+    name = "rust_example",
+    srcs = ["example.rs"],
+    edition = "2021",
+    rustc_flags = [
+        "-C", "panic=abort",
+    ],
+)

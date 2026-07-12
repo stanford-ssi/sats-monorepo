@@ -20,6 +20,7 @@ cc_library(
     deps = [
         "//common/cobs",
         "//common/utils",
+        "//common/rust_example",
     ]
 )
 

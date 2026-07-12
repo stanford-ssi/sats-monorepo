@@ -7,6 +7,16 @@ module(
     version = "0.0.1",
 )
 
+bazel_dep(name = "rules_rust", version = "0.54.1")  # check for latest
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    extra_target_triples = ["thumbv8m.main-none-eabi"],
+)
+use_repo(rust, "rust_toolchains")
+register_toolchains("@rust_toolchains//:all")
+
 # Platform definitions for cross-compilation
 bazel_dep(name = "platforms", version = "0.0.11")
 
