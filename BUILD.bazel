@@ -18,7 +18,8 @@ cc_library(
     ],
     includes = ["apps/blink/src"],
     deps = [
-        "//common/cobs:cobs",
+        "//common/cobs",
+        "//common/utils",
     ]
 )
 

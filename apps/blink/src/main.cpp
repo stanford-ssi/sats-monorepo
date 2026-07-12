@@ -2,6 +2,7 @@
 #include "pico/stdlib.h"
 
 #include "cobs.hpp"
+#include "RingBuffer.hpp"
 
 #include "tusb.h"
 
@@ -20,17 +21,22 @@ int main() {
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
-    uint8_t buf[64];
+    static RingBuffer<uint8_t, 256> usb_rx_rb;
     while (true) {
+        int c;
+        if (tud_cdc_available()) {
+            while ((c = tud_cdc_read_char()) >= 0) {
+                if (!usb_rx_rb.push(static_cast<uint8_t>(c))) {
+                    // buffer full — byte dropped, consider handling/logging this
+                    break;
+                }
+            }
+        }
         tud_task();
         gpio_put(LED_PIN, 1);
         sleep_ms(gSlate.sleep_ms);
         gpio_put(LED_PIN, 0);
         sleep_ms(gSlate.sleep_ms);
-        if (tud_cdc_available()) {
-            uint32_t count = tud_cdc_read(buf, sizeof(buf));
-            tud_cdc_write(buf, count);
-            tud_cdc_write_flush();
-        }
-    }
-}
+
+    } // main whil
+} // int main

@@ -1,9 +1,8 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "cobs",
-    srcs = ["cobs.cpp"],
-    hdrs = ["cobs.hpp"],
+    name = "utils",
+    hdrs = ["RingBuffer.hpp"],
     includes = ["."],
     target_compatible_with = ["//platforms:arm_cortex_m33"],
 )
