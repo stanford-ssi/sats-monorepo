@@ -11,29 +11,34 @@ package(default_visibility = ["//visibility:public"])
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-EMBEDDED_WARNING_COPTS = [
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-Wshadow",
-    "-Wdouble-promotion",
-]
-
 cc_library(
     name = "blink_lib",
-    hdrs = ["apps/blink/src/slate.hpp"],
+    hdrs = [
+        "apps/blink/src/slate.hpp",
+    ],
     includes = ["apps/blink/src"],
+    deps = [
+        "//common/cobs:cobs",
+    ]
 )
 
 cc_binary(
     name = "blink",
     srcs = ["apps/blink/src/main.cpp"],
     includes = ["apps/blink/src"],
-    copts = EMBEDDED_WARNING_COPTS,
+    copts = [
+         "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-Wdouble-promotion",
+        "-DCFG_TUD_CDC=2",
+    ],
     deps = [
         ":blink_lib",
-        "//common/proto:sats_command_nanopb",
+        "//proto:sats_command_nanopb",
         "@pico-sdk//src/rp2_common/pico_stdlib",
+        "@pico-sdk//src/rp2_common/pico_stdio_usb",
     ],
 )
 

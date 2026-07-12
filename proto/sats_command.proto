@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package ssi.protobuf;
-
 /**
  * Writes a value to an offset in slate
  */
