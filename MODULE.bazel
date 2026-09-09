@@ -28,7 +28,7 @@ bazel_dep(name = "pico-sdk", version = "2.2.0")
 
 # Protobuf and nanopb
 bazel_dep(name = "nanopb", version = "0.4.9.1.bcr.2")
-bazel_dep(name = "protobuf", version = "33.4")
+bazel_dep(name = "protobuf", version = "36.1.bcr.1")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 
 # Register pico-sdk toolchains for macOS (both Intel and Apple Silicon)
@@ -38,3 +38,6 @@ register_toolchains(
     "@pico-sdk//bazel/toolchain:linux-aarch64-rp2350",
     "@pico-sdk//bazel/toolchain:linux-x86_64-rp2350",
 )
+
+# Google Test Framework
+bazel_dep(name = "googletest", version = "1.17.0")
