@@ -1,0 +1,19 @@
+[project]
+name = "sats-has-mono"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Carson Lauer", email = "lauercarson@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "pyelftools>=0.33",
+]
+
+[project.scripts]
+sats-has-mono = "sats_has_mono:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
