@@ -1,0 +1,14 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "cmd_receiver",
+    hdrs = ["cmd_receiver.hpp"],
+    srcs = ["cmd_receiver.cpp"],
+    includes = ["."],
+    deps = [
+        "//common/utils",
+        "//proto:sats_command_nanopb",
+        "@pico-sdk//src/rp2_common/pico_stdio_usb",
+    ],
+    target_compatible_with = ["//platforms:arm_cortex_m33"],
+)

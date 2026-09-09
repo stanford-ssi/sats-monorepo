@@ -6,8 +6,10 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "queue.hpp"
+
 template <typename T, std::size_t Size>
-class RingBuffer {
+class RingBuffer : public Queue<T> {
     static_assert((Size & (Size - 1)) == 0, "Size must be a power of 2");
     static_assert(Size > 0, "Size must be non-zero");
 
@@ -64,3 +66,4 @@ private:
     volatile std::size_t head_;  // next write index
     volatile std::size_t tail_;  // next read index
 };
+

@@ -3,7 +3,7 @@ syntax = "proto3";
 /**
  * Writes a value to an offset in slate
  */
-message WordCommand {
+message SatCmd {
   uint32 offset = 1; // memory
   uint32 value = 2;
 }
