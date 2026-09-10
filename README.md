@@ -1,16 +1,26 @@
-## How to build an app
+# SSI Sats Monorepo
 
-``` bash
+## Build the example firmware
+
+```bash
 bazel build --config=pico //:blink
 ```
 
+## Run the tests
 
-## How to run a test case
-``` bash
-bazel test --cxxopt=-std=c++17 --test_output=all //test:example_test
+```bash
+bazel test --test_output=all //test:example_test
 ```
 
-## How to run scripts using uv
-``` bash
+## Run the CI checks locally
+
+```bash
+bazel test //test:example_test --test_output=errors
+bazel build --config=pico //:blink
+```
+
+## Run Python tools
+
+```bash
 uv run scripts/parse_slate.py bazel-bin/blink Slate
 ```

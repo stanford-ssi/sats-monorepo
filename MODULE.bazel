@@ -3,7 +3,7 @@ Module definition for Stanford Student Space Initiative's Monorepo
 """
 
 module(
-    name = "sats_has_mono",
+    name = "sats_monorepo",
     version = "0.0.1",
 )
 
