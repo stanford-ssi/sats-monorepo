@@ -1,0 +1,12 @@
+# Bazel output symlinks and local configuration
+/bazel-*
+/.bazelrc.local
+
+# Python
+__pycache__/
+*.py[cod]
+/.venv/
+/.pytest_cache/
+
+# Editors and operating systems
+.DS_Store

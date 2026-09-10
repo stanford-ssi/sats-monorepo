@@ -1,7 +1,7 @@
 [project]
-name = "sats-has-mono"
+name = "sats-monorepo"
 version = "0.1.0"
-description = "Add your description here"
+description = "Monorepo for SSI satellites"
 readme = "README.md"
 authors = [
     { name = "Carson Lauer", email = "lauercarson@gmail.com" }
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sats-has-mono = "sats_has_mono:main"
+sats-monorepo = "sats_monorepo:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
