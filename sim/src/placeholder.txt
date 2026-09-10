@@ -1,2 +1,0 @@
-should mirror include/gnc_sims/, with one .cpp file
-per header. 
