@@ -9,3 +9,17 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "cmd_receiver_test",
+    size = "small",
+    srcs = ["cmd_receiver_test.cpp"],
+    deps = [
+        "//common/cmd_receiver",
+        "//common/cobs",
+        "//common/util",
+        "//proto:sats_command_nanopb",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)

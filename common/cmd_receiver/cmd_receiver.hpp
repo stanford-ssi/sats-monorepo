@@ -4,34 +4,63 @@
  * Date: 8 September 2026
  */
 
-#include "ring_buffer.hpp"
 
 #include "stdint.h"
 
+#include <array>
+#include <cstddef>
 #include <optional>
 
 #include "pb_decode.h"
 #include "proto/sats_command.pb.h"
 
-#include "queue.hpp"
+#include "common/util/ring_buffer.hpp"
+#include "common/util/queue.hpp"
 
+/**
+ * Reassembles SatCmds from a stream of cobs encoded bytes.
+ *
+ * Bytes are pulled from `in` (usb on flight hardware, a ring buffer in the
+ * unit tests) and cobs decoded one at a time. A zero byte delimits a frame;
+ * every complete frame is run through nanopb and queued up for get_cmd().
+ */
 class CmdReceiver
 {
 public:
-    CmdReceiver();
+    CmdReceiver(Queue<uint8_t> &in);
 
     CmdReceiver(CmdReceiver &&other) = delete;
     CmdReceiver(const CmdReceiver &other) = delete;
     CmdReceiver &operator=(CmdReceiver &&other) = delete;
     CmdReceiver &operator=(const CmdReceiver &cmd) = delete;
-    
-    uint32_t update(Queue<uint8_t> &in);
+
+    /**
+     * Drain the input queue, decoding whatever has arrived. Returns the
+     * number of complete commands that were queued up for get_cmd().
+     */
+    uint32_t update();
+
+    /**
+     * Pop the oldest decoded command, or nothing if none are pending.
+     */
     std::optional<SatCmd> get_cmd();
 private:
-    int overhead_state_{}; 
-    int pos_{};
-    RingBuffer<uint8_t, 256> buf_{};
+    /* Longest frame we are willing to reassemble. A SatCmd is 12 bytes. */
+    static constexpr std::size_t kMaxFrameSize = 256;
+
+    Queue<uint8_t>& in_;
+
+    /* Cobs decoder state, see decode_c(). */
+    int code_{}; // length of the block being decoded, code byte included
+    int pos_{};  // bytes of that block consumed so far, code byte included
+
+    /* The frame being reassembled, decoded but not yet delimited. */
+    std::array<uint8_t, kMaxFrameSize> buf_{};
+    std::size_t len_{};
+    bool overflowed_{};
+
     RingBuffer<SatCmd, 8> cmd_buffer_{};
 
     std::optional<uint8_t> decode_c(uint8_t next);
+    bool finish_frame();
 };

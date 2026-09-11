@@ -4,6 +4,4 @@ cc_library(
     name = "cobs",
     srcs = ["cobs.cpp"],
     hdrs = ["cobs.hpp"],
-    includes = ["."],
-    target_compatible_with = ["//platforms:arm_cortex_m33"],
 )

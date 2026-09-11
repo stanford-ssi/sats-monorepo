@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <type_traits>
 
-#include "queue.hpp"
+#include "common/util/queue.hpp"
 
 template <typename T, std::size_t Size>
 class RingBuffer : public Queue<T> {
@@ -16,7 +16,7 @@ class RingBuffer : public Queue<T> {
 public:
     RingBuffer() : head_(0), tail_(0) {}
 
-    bool empty() const {
+    bool empty() const override {
         return head_ == tail_;
     }
 
@@ -25,7 +25,7 @@ public:
     }
 
     // Returns false if the buffer was full (item dropped)
-    bool push(const T& item) {
+    bool push(const T& item) override {
         std::size_t next_head = next(head_);
         if (next_head == tail_) {
             return false;  // full
@@ -36,7 +36,7 @@ public:
     }
 
     // Returns false if the buffer was empty
-    bool pop(T& item) {
+    bool pop(T& item) override {
         if (head_ == tail_) {
             return false;  // empty
         }

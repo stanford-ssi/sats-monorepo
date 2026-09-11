@@ -1,8 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "utils",
+    name = "util",
     hdrs = ["ring_buffer.hpp", "queue.hpp"],
-    includes = ["."],
-    target_compatible_with = ["//platforms:arm_cortex_m33"],
 )

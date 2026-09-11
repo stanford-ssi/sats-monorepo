@@ -19,9 +19,9 @@ cc_library(
     includes = ["apps/blink/src"],
     deps = [
         "//common/cobs",
-        "//common/utils",
+        "//common/util",
         "//common/cmd_receiver",
-        "//common/rust_example",
+        "//hal:pico_hal",
     ]
 )
 
@@ -41,7 +41,6 @@ cc_binary(
         ":blink_lib",
         "//proto:sats_command_nanopb",
         "@pico-sdk//src/rp2_common/pico_stdlib",
-        "@pico-sdk//src/rp2_common/pico_stdio_usb",
     ],
 )
 
