@@ -6,6 +6,7 @@ cc_library(
     srcs = ["pico/usb_queue.cpp"],
     deps = [
         "//common/util",
+        "@pico-sdk//src/rp2_common/pico_stdlib",
         "@pico-sdk//src/rp2_common/pico_stdio_usb",
     ],
     strip_include_prefix = "/hal/include",
