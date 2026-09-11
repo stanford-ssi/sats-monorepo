@@ -49,6 +49,46 @@ void send_cmd(UsbSim &usb, const SatCmd &cmd)
     send_frame(usb, serialize(cmd));
 }
 
+SatCmd write_u8(uint32_t offset, uint32_t value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_u8_tag;
+    cmd.cmd.write_u8 = {offset, value};
+    return cmd;
+}
+
+SatCmd write_u16(uint32_t offset, uint32_t value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_u16_tag;
+    cmd.cmd.write_u16 = {offset, value};
+    return cmd;
+}
+
+SatCmd write_u32(uint32_t offset, uint32_t value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_u32_tag;
+    cmd.cmd.write_u32 = {offset, value};
+    return cmd;
+}
+
+SatCmd write_f32(uint32_t offset, float value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_f32_tag;
+    cmd.cmd.write_f32 = {offset, value};
+    return cmd;
+}
+
+SatCmd read_field(uint32_t offset, Width width)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_read_tag;
+    cmd.cmd.read = {offset, width};
+    return cmd;
+}
+
 TEST(CmdReceiverTest, NothingOnTheLinkYieldsNothing)
 {
     UsbSim usb{};
@@ -63,17 +103,62 @@ TEST(CmdReceiverTest, DecodesOneCommand)
     UsbSim usb{};
     CmdReceiver recv{usb};
 
-    send_cmd(usb, SatCmd{.offset = 4, .value = 1234});
+    send_cmd(usb, write_u8(4, 123));
 
     EXPECT_EQ(recv.update(), 1u);
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
-    EXPECT_EQ(cmd->offset, 4u);
-    EXPECT_EQ(cmd->value, 1234u);
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u8_tag);
+    EXPECT_EQ(cmd->cmd.write_u8.offset, 4u);
+    EXPECT_EQ(cmd->cmd.write_u8.value, 123u);
 
     /* Only the one command was queued. */
     EXPECT_FALSE(recv.get_cmd().has_value());
+}
+
+TEST(CmdReceiverTest, DecodesEveryVariant)
+{
+    UsbSim usb{};
+    CmdReceiver recv{usb};
+
+    send_cmd(usb, write_u8(4, 0xFF));
+    send_cmd(usb, write_u16(8, 0xBEEF));
+    send_cmd(usb, write_u32(12, 0xDEADBEEF));
+    send_cmd(usb, write_f32(16, -2.5f));
+    send_cmd(usb, read_field(20, Width_WIDTH_F32));
+
+    EXPECT_EQ(recv.update(), 5u);
+
+    std::optional<SatCmd> cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u8_tag);
+    EXPECT_EQ(cmd->cmd.write_u8.offset, 4u);
+    EXPECT_EQ(cmd->cmd.write_u8.value, 0xFFu);
+
+    cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u16_tag);
+    EXPECT_EQ(cmd->cmd.write_u16.offset, 8u);
+    EXPECT_EQ(cmd->cmd.write_u16.value, 0xBEEFu);
+
+    cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u32_tag);
+    EXPECT_EQ(cmd->cmd.write_u32.offset, 12u);
+    EXPECT_EQ(cmd->cmd.write_u32.value, 0xDEADBEEFu);
+
+    cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_f32_tag);
+    EXPECT_EQ(cmd->cmd.write_f32.offset, 16u);
+    EXPECT_EQ(cmd->cmd.write_f32.value, -2.5f);
+
+    cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_read_tag);
+    EXPECT_EQ(cmd->cmd.read.offset, 20u);
+    EXPECT_EQ(cmd->cmd.read.width, Width_WIDTH_F32);
 }
 
 TEST(CmdReceiverTest, DecodesBackToBackFramesInOrder)
@@ -81,8 +166,8 @@ TEST(CmdReceiverTest, DecodesBackToBackFramesInOrder)
     UsbSim usb{};
     CmdReceiver recv{usb};
 
-    send_cmd(usb, SatCmd{.offset = 1, .value = 10});
-    send_cmd(usb, SatCmd{.offset = 2, .value = 20});
+    send_cmd(usb, write_u8(1, 10));
+    send_cmd(usb, write_u8(2, 20));
 
     EXPECT_EQ(recv.update(), 2u);
 
@@ -90,8 +175,8 @@ TEST(CmdReceiverTest, DecodesBackToBackFramesInOrder)
     std::optional<SatCmd> second = recv.get_cmd();
     ASSERT_TRUE(first.has_value());
     ASSERT_TRUE(second.has_value());
-    EXPECT_EQ(first->offset, 1u);
-    EXPECT_EQ(second->offset, 2u);
+    EXPECT_EQ(first->cmd.write_u8.offset, 1u);
+    EXPECT_EQ(second->cmd.write_u8.offset, 2u);
 }
 
 TEST(CmdReceiverTest, WaitsForTheDelimiterAcrossUpdates)
@@ -100,7 +185,7 @@ TEST(CmdReceiverTest, WaitsForTheDelimiterAcrossUpdates)
     CmdReceiver recv{usb};
 
     /* Half a frame arrives, as it would from a short usb read. */
-    std::vector<uint8_t> payload = serialize(SatCmd{.offset = 7, .value = 99});
+    std::vector<uint8_t> payload = serialize(write_u16(7, 99));
     std::vector<uint8_t> encoded(payload.size() + 2);
     uint32_t n = cobs_encode(payload.data(), payload.size(), encoded.data());
     ASSERT_GT(n, 1u);
@@ -118,8 +203,9 @@ TEST(CmdReceiverTest, WaitsForTheDelimiterAcrossUpdates)
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
-    EXPECT_EQ(cmd->offset, 7u);
-    EXPECT_EQ(cmd->value, 99u);
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u16_tag);
+    EXPECT_EQ(cmd->cmd.write_u16.offset, 7u);
+    EXPECT_EQ(cmd->cmd.write_u16.value, 99u);
 }
 
 TEST(CmdReceiverTest, RestoresZeroBytesStrippedByCobs)
@@ -127,17 +213,37 @@ TEST(CmdReceiverTest, RestoresZeroBytesStrippedByCobs)
     UsbSim usb{};
     CmdReceiver recv{usb};
 
-    /* offset = 42, then a value of 0 spelled out as an explicit varint so
-       that the payload actually carries a zero byte for cobs to strip. */
-    const std::vector<uint8_t> payload = {0x08, 0x2A, 0x10, 0x00};
+    /* write_u8{offset = 42, value = 0}, with the zero value spelled out as
+       an explicit varint rather than omitted the way proto3 would, so that
+       the payload actually carries a zero byte for cobs to strip. */
+    const std::vector<uint8_t> payload = {0x0A, 0x04, 0x08, 0x2A, 0x10, 0x00};
     send_frame(usb, payload);
 
     EXPECT_EQ(recv.update(), 1u);
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
-    EXPECT_EQ(cmd->offset, 42u);
-    EXPECT_EQ(cmd->value, 0u);
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u8_tag);
+    EXPECT_EQ(cmd->cmd.write_u8.offset, 42u);
+    EXPECT_EQ(cmd->cmd.write_u8.value, 0u);
+}
+
+TEST(CmdReceiverTest, RestoresTheZeroBytesInsideAFloat)
+{
+    UsbSim usb{};
+    CmdReceiver recv{usb};
+
+    /* 1.0f is 00 00 80 3f on the wire, so two thirds of its bytes are zeros
+       cobs has to stand in for. No hand written payload needed. */
+    send_cmd(usb, write_f32(64, 1.0f));
+
+    EXPECT_EQ(recv.update(), 1u);
+
+    std::optional<SatCmd> cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_f32_tag);
+    EXPECT_EQ(cmd->cmd.write_f32.offset, 64u);
+    EXPECT_EQ(cmd->cmd.write_f32.value, 1.0f);
 }
 
 TEST(CmdReceiverTest, IgnoresStrayDelimiters)
@@ -148,7 +254,7 @@ TEST(CmdReceiverTest, IgnoresStrayDelimiters)
     for (int i = 0; i < 3; i++) {
         ASSERT_TRUE(usb.push(0));
     }
-    send_cmd(usb, SatCmd{.offset = 5, .value = 6});
+    send_cmd(usb, write_u8(5, 6));
 
     EXPECT_EQ(recv.update(), 1u);
     ASSERT_TRUE(recv.get_cmd().has_value());
@@ -161,14 +267,15 @@ TEST(CmdReceiverTest, DropsUndecodableFrameAndResyncs)
 
     /* Field 1 with wire type 7, which is not a thing. */
     send_frame(usb, {0x0F, 0x0F});
-    send_cmd(usb, SatCmd{.offset = 8, .value = 9});
+    send_cmd(usb, write_u32(8, 9));
 
     EXPECT_EQ(recv.update(), 1u);
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
-    EXPECT_EQ(cmd->offset, 8u);
-    EXPECT_EQ(cmd->value, 9u);
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u32_tag);
+    EXPECT_EQ(cmd->cmd.write_u32.offset, 8u);
+    EXPECT_EQ(cmd->cmd.write_u32.value, 9u);
 }
 
 TEST(CmdReceiverTest, DropsOversizedFrameAndResyncs)
@@ -181,14 +288,15 @@ TEST(CmdReceiverTest, DropsOversizedFrameAndResyncs)
     std::vector<uint8_t> huge(300, 0xAB);
     huge[280] = 0;
     send_frame(usb, huge);
-    send_cmd(usb, SatCmd{.offset = 3, .value = 4});
+    send_cmd(usb, write_u8(3, 4));
 
     EXPECT_EQ(recv.update(), 1u);
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
-    EXPECT_EQ(cmd->offset, 3u);
-    EXPECT_EQ(cmd->value, 4u);
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_u8_tag);
+    EXPECT_EQ(cmd->cmd.write_u8.offset, 3u);
+    EXPECT_EQ(cmd->cmd.write_u8.value, 4u);
 }
 
 } // namespace

@@ -2,5 +2,5 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "util",
-    hdrs = ["ring_buffer.hpp", "queue.hpp"],
+    hdrs = ["ring_buffer.hpp", "queue.hpp", "interval.hpp"],
 )

@@ -21,6 +21,8 @@ cc_library(
         "//common/cobs",
         "//common/util",
         "//common/cmd_receiver",
+        "//common/cmd_responder",
+        "//common/slate",
         "//hal:pico_hal",
     ]
 )

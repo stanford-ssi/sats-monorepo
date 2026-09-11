@@ -1,6 +1,9 @@
 # SSI Sats Monorepo
 
-## Build the example firmware
+Flight software, ground tooling and sims for SSI's cubesat, in one Bazel
+workspace. The firmware targets an RP2350 (pico 2).
+
+## How to build an app
 
 ```bash
 bazel build --config=pico //:blink
@@ -8,10 +11,16 @@ bazel build --config=pico //:blink
 
 The uf2 and the elf both land in `bazel-bin/`, as `blink.uf2` and `blink`.
 
+Note that `bazel-bin` is a symlink bazel repoints at whichever configuration
+it built last, so running the host tests aims it at a tree with no firmware
+in it. The ground tooling works around this by asking bazel where the pico
+build went, but `bazel-bin/blink.uf2` in a flashing command is only valid
+until the next host build.
+
 ## How to flash a pico
 
-The board is an RP2350 (pico 2). If it is plugged in over usb and already
-running pico-sdk firmware, picotool can reboot it into BOOTSEL itself:
+If the board is plugged in over usb and already running pico-sdk firmware,
+picotool can reboot it into BOOTSEL itself:
 
 ``` bash
 picotool load -f -x bazel-bin/blink.uf2
@@ -38,37 +47,81 @@ To see what is currently flashed (`-f` reboots the board to read it):
 picotool info -a -f
 ```
 
-## How to send commands to a running board
+## How to command a running board
 
-`send_cmd.py` reads the field offsets out of the elf's debug info, so the
-offsets always match the binary you actually flashed. It prompts for values
-and writes cobs framed SatCmds to the board's usb cdc port.
+The slate is the flight software's state struct. `satui.py` reads its field
+offsets out of the elf's DWARF debug info, so the offsets always match the
+binary you actually flashed, and talks to the board over usb cdc.
 
 ``` bash
-uv run scripts/send_cmd.py                     # sleep_ms, port autodetected
-uv run scripts/send_cmd.py --field temperature
-uv run scripts/send_cmd.py --dry-run           # print the frames, send nothing
+uv run scripts/satui.py            # the ui, port autodetected
+uv run scripts/satui.py --list     # print the fields and exit
+uv run scripts/satui.py --fake     # run against an in process fake board
+uv run scripts/satui.py --set sleep_ms=500 --set board_power.voltage=3.3
 ```
 
-At the prompt, enter a bare value to write the current field, or
-`<field> <value>` to switch fields. Reading the serial port needs membership
-in the `dialout` group.
+The ui draws in the last few lines of the terminal rather than taking the
+screen over, so whatever you were looking at stays put and the last frame
+is left behind when you quit, like any other command's output:
 
-## How to run the test cases
+```
+╭─ Slate ──────────────────────────────────── /dev/ttyACM0 ─╮
+│   field                offset  type                 value │
+│ › sleep_ms                  0  uint32                 250 │
+│   temperature               4  float                 36.5 │
+│   board_power.voltage       8  float                  3.3 │
+│   board_power.current      12  float                 0.75 │
+╰───────────────────────────────────────────────────────────╯
+  sleep_ms <- 250
+  w write · r refresh · a auto · j/k move · g/G ends · q quit
+```
+
+Every value shown is read back from the board rather than remembered
+locally, so a refused write is visibly different from one that landed;
+`BAD_OFFSET` and friends show up in the value column in red.
+
+| key | |
+|---|---|
+| `j` / `k`, arrows | move |
+| `g` / `G` | first / last field |
+| `Ctrl-D` / `Ctrl-U` | half page |
+| `w`, `i` or Enter | write to the selected field |
+| Enter / `Esc` | commit / cancel a write |
+| `r` | refresh all fields |
+| `a` | toggle auto refresh |
+| `q` or `:q` | quit |
+
+Colour and box drawing are dropped automatically when stdout is not a
+terminal, and `NO_COLOR` is honoured. Talking to the board needs
+membership in the `dialout` group.
+
+### The command protocol
+
+`proto/sats_command.proto` is the contract. A `SatCmd` is a oneof over
+`WriteU8` / `WriteU16` / `WriteU32` / `WriteF32` / `ReadField`, each
+addressing a slate field by byte offset. The board answers every command
+with a `SatResponse` carrying a status and the value that actually landed.
+Messages are nanopb encoded and cobs framed, one zero byte per frame.
+
+Writes are bounds and alignment checked against `sizeof(Slate)`, so a bad
+offset comes back as `BAD_OFFSET` rather than corrupting memory.
+
+## How to run the tests
 
 ``` bash
-bazel test //...
+bazel test //...     # firmware and host c++
+uv run pytest        # ground tooling
 ```
 
 ## Run the CI checks locally
 
-```bash
+``` bash
 bazel test //test:example_test --test_output=errors
 bazel build --config=pico //:blink
 ```
 
-## Run Python tools
+## Other scripts
 
-```bash
-uv run scripts/parse_slate.py bazel-bin/blink Slate
+``` bash
+uv run scripts/parse_slate.py bazel-bin/blink Slate --flat
 ```

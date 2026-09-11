@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 struct PowerInfo {
     float voltage{};
     float current{};
@@ -10,5 +12,3 @@ struct Slate {
     float temperature{};
     PowerInfo board_power{};
 };
-
-

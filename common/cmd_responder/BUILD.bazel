@@ -1,0 +1,12 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "cmd_responder",
+    hdrs = ["cmd_responder.hpp"],
+    srcs = ["cmd_responder.cpp"],
+    deps = [
+        "//common/cobs",
+        "//common/util",
+        "//proto:sats_command_nanopb",
+    ],
+)

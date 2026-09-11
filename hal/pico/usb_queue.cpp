@@ -14,7 +14,22 @@ UsbQueue::UsbQueue() {
 }
 
 bool UsbQueue::push(const uint8_t& item) {
-    return tud_cdc_write_char(item) == 1;
+    if (tud_cdc_write_char(item) != 1) {
+        /* The cdc fifo is full. Kick what is already in it so the next
+           attempt has somewhere to land; this byte is dropped. */
+        tud_cdc_write_flush();
+        return false;
+    }
+
+    /* Bytes sit in the cdc fifo until something flushes them, but a flush
+       per byte spends a usb transaction on each one. Queue has no flush in
+       its interface, so we lean on the framing instead: a zero byte is the
+       cobs delimiter that ends a frame, which is exactly when the whole
+       response should go out. */
+    if (item == 0) {
+        tud_cdc_write_flush();
+    }
+    return true;
 }
 
 bool UsbQueue::pop(uint8_t& item) {

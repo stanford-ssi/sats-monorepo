@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-struct_offsets.py — dump field offsets/sizes/types for a struct from an ELF's
+parse_slate.py - dump field offsets/sizes/types for a struct from an ELF's
 DWARF debug info.
 
 Usage:
-    python3 struct_offsets.py <path-to-elf> <StructName> [--json]
-
-Requires:
-    pip install pyelftools --break-system-packages
+    uv run scripts/parse_slate.py <path-to-elf> <StructName> [--flat] [--json]
 
 Notes:
     - The ELF must be compiled with debug info (-g).
@@ -110,40 +107,83 @@ def _walk(die, struct_name, matches):
         _walk(child, struct_name, matches)
 
 
-def dump_struct(die: DIE):
-    total_size = die.attributes.get("DW_AT_byte_size")
-    total_size = total_size.value if total_size else None
+AGGREGATE_TAGS = ("DW_TAG_structure_type", "DW_TAG_class_type", "DW_TAG_union_type")
 
+
+def target_type(die: DIE):
+    """The DIE a type or member points at, if it points at one."""
+    return die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+
+
+def strip_qualifiers(die: DIE):
+    """Peel typedefs and cv qualifiers off until a type with a layout is left."""
+    while die is not None and die.tag in ("DW_TAG_typedef", "DW_TAG_const_type", "DW_TAG_volatile_type"):
+        die = target_type(die)
+    return die
+
+
+def struct_members(die: DIE, flatten: bool = False, prefix: str = "", base: int = 0) -> list:
+    """Field records for a struct's members, with offsets relative to `base`.
+
+    With `flatten`, a member that is itself a struct is replaced by its own
+    members under a dotted name, so `board_power.voltage` is reported at the
+    absolute offset the firmware would use for it. Without it the nested
+    struct stays one opaque member, which is all a caller that can only
+    address whole words can use anyway.
+    """
     fields = []
     for child in die.iter_children():
-        if child.tag != "DW_TAG_member":
-            continue
-        fname = child.attributes["DW_AT_name"].value.decode()
-        offset = child.attributes.get("DW_AT_data_member_location")
-        offset = offset.value if offset else 0
-        ftype_die = child.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in child.attributes else None
-        ftype = type_name(ftype_die)
-        fsize = die_byte_size(ftype_die)
+        if child.tag != "DW_TAG_member" or "DW_AT_declaration" in child.attributes:
+            continue  # a static data member has no storage inside the struct
+
+        name = child.attributes.get("DW_AT_name")
+        name = name.value.decode() if name else ""
+        location = child.attributes.get("DW_AT_data_member_location")
+        offset = base + (location.value if location else 0)
+        ftype_die = target_type(child)
+
+        inner = strip_qualifiers(ftype_die)
+        if flatten and inner is not None and inner.tag in AGGREGATE_TAGS:
+            # An anonymous member contributes no name of its own to the path.
+            nested_prefix = f"{prefix}{name}." if name else prefix
+            nested = struct_members(inner, flatten, nested_prefix, offset)
+            if nested:
+                fields += nested
+                continue
+
         fields.append({
-            "name": fname,
+            "name": prefix + name,
             "offset": offset,
-            "size": fsize,
-            "type": ftype,
+            "size": die_byte_size(ftype_die),
+            "type": type_name(ftype_die),
         })
 
-    return {"size": total_size, "fields": fields}
+    return fields
 
-def get_struct_layout(elf_path: str, struct_name: str) -> dict:
-    """Returns {field_name: {'offset': int, 'size': int, 'type': str}}"""
+
+def dump_struct(die: DIE, flatten: bool = False):
+    total_size = die.attributes.get("DW_AT_byte_size")
+    total_size = total_size.value if total_size else None
+    return {"size": total_size, "fields": struct_members(die, flatten)}
+
+
+def get_struct_layout(elf_path: str, struct_name: str, flatten: bool = True) -> dict:
+    """Returns {field_name: {'offset': int, 'size': int, 'type': str}}
+
+    Flattens nested structs by default: every leaf is separately addressable
+    by the command set, so `board_power.voltage` is more useful to a caller
+    than an eight byte `board_power` it cannot do anything with.
+    """
     with open(elf_path, "rb") as f:
         elf = ELFFile(f)
         dwarf_info = elf.get_dwarf_info()
         matches = find_structs(dwarf_info, struct_name)
 
-    if not matches:
-        raise ValueError(f"struct '{struct_name}' not found")
+        if not matches:
+            raise ValueError(f"struct '{struct_name}' not found")
 
-    result = dump_struct(matches[0])  # first match
+        result = dump_struct(matches[0], flatten)  # first match
+
     return {f["name"]: {"offset": f["offset"], "size": f["size"], "type": f["type"]} for f in result["fields"]}
 
 
@@ -152,6 +192,7 @@ def main():
     parser.add_argument("elf_path")
     parser.add_argument("struct_name")
     parser.add_argument("--json", action="store_true", help="output as JSON instead of a table")
+    parser.add_argument("--flat", action="store_true", help="expand nested structs into dotted members")
     args = parser.parse_args()
 
     with open(args.elf_path, "rb") as f:
@@ -163,11 +204,11 @@ def main():
         dwarf_info = elf.get_dwarf_info()
         matches = find_structs(dwarf_info, args.struct_name)
 
-    if not matches:
-        print(f"error: struct '{args.struct_name}' not found", file=sys.stderr)
-        sys.exit(1)
+        if not matches:
+            print(f"error: struct '{args.struct_name}' not found", file=sys.stderr)
+            sys.exit(1)
 
-    results = [dump_struct(die) for die in matches]
+        results = [dump_struct(die, args.flat) for die in matches]
 
     if args.json:
         print(json.dumps(results, indent=2))

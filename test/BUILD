@@ -23,3 +23,28 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "cmd_responder_test",
+    size = "small",
+    srcs = ["cmd_responder_test.cpp"],
+    deps = [
+        "//common/cmd_responder",
+        "//common/cobs",
+        "//common/util",
+        "//proto:sats_command_nanopb",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "interval_test",
+    size = "small",
+    srcs = ["interval_test.cpp"],
+    deps = [
+        "//common/util",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)

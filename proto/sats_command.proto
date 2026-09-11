@@ -1,9 +1,74 @@
 syntax = "proto3";
 
 /**
- * Writes a value to an offset in slate
+ * Ground to flight software command set.
+ *
+ * Every command addresses a slate field by its byte offset from the start of
+ * the slate, which the ground looks up from the firmware elf's debug info.
  */
-message SatCmd {
-  uint32 offset = 1; // memory
+
+/* Width of the value at an offset. Also picks how it is interpreted. */
+enum Width {
+  WIDTH_UNSPECIFIED = 0;
+  WIDTH_U8 = 1;
+  WIDTH_U16 = 2;
+  WIDTH_U32 = 3;
+  WIDTH_F32 = 4;
+}
+
+message WriteU8 {
+  uint32 offset = 1;
+  uint32 value = 2; // truncated to 8 bits
+}
+
+message WriteU16 {
+  uint32 offset = 1;
+  uint32 value = 2; // truncated to 16 bits
+}
+
+message WriteU32 {
+  uint32 offset = 1;
   uint32 value = 2;
+}
+
+message WriteF32 {
+  uint32 offset = 1;
+  float value = 2;
+}
+
+/* Ask for the current contents of a field, answered with a SatResponse. */
+message ReadField {
+  uint32 offset = 1;
+  Width width = 2;
+}
+
+message SatCmd {
+  oneof cmd {
+    WriteU8 write_u8 = 1;
+    WriteU16 write_u16 = 2;
+    WriteU32 write_u32 = 3;
+    WriteF32 write_f32 = 4;
+    ReadField read = 5;
+  }
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_BAD_OFFSET = 2;  // out of bounds, or misaligned for the width
+  STATUS_BAD_COMMAND = 3; // undecodable, or no variant set
+}
+
+/**
+ * Flight software's reply to a SatCmd. Writes are answered with the value
+ * that actually landed, so the ground can confirm rather than assume.
+ */
+message SatResponse {
+  Status status = 1;
+  uint32 offset = 2; // echoed back so replies can be matched to requests
+  Width width = 3;
+  oneof value {
+    uint32 uint_value = 4;
+    float float_value = 5;
+  }
 }

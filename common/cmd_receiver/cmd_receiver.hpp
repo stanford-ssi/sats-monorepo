@@ -45,8 +45,10 @@ public:
      */
     std::optional<SatCmd> get_cmd();
 private:
-    /* Longest frame we are willing to reassemble. A SatCmd is 12 bytes. */
+    /* Longest frame we are willing to reassemble. A SatCmd is 14 bytes at
+       most, so this leaves plenty of room for the contract to grow. */
     static constexpr std::size_t kMaxFrameSize = 256;
+    static_assert(SatCmd_size <= kMaxFrameSize, "frames would never fit");
 
     Queue<uint8_t>& in_;
 

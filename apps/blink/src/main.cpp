@@ -4,12 +4,15 @@
 #include "common/cobs/cobs.hpp"
 #include "common/util/ring_buffer.hpp"
 #include "common/util/queue.hpp"
+#include "common/util/interval.hpp"
 
 #include "tusb.h"
 
 #include "proto/sats_command.pb.h"
 
 #include "common/cmd_receiver/cmd_receiver.hpp"
+#include "common/cmd_responder/cmd_responder.hpp"
+#include "common/slate/slate_writer.hpp"
 
 #include "hal/usb_queue.hpp"
 #include <optional>
@@ -27,24 +30,31 @@ int main()
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
+
     UsbQueue q{};
-    CmdReceiver recv = CmdReceiver(q);
+    CmdReceiver recv{q};
+    CmdResponder responder{q};
+    SlateWriter<Slate> writer{gSlate};
+
+    Interval blink{};
+    bool led_on = false;
 
     while (true) {
         recv.update();
-        std::optional<SatCmd> cmd = recv.get_cmd();
-        if (cmd) {
-            SatCmd cmd_val = cmd.value();
-            uint8_t *ptr = reinterpret_cast<uint8_t*>(&gSlate);
-            ptr += cmd_val.offset;
-            uint32_t *int_ptr = reinterpret_cast<uint32_t*>(ptr);
-            *int_ptr = cmd_val.value;
+
+        /* Drain every command that arrived; the receiver only holds 8, so
+           taking one per pass would quietly drop the rest of a burst. */
+        while (std::optional<SatCmd> cmd = recv.get_cmd()) {
+            responder.send(writer.apply(*cmd));
         }
 
-        gpio_put(LED_PIN, 1);
-        sleep_ms(gSlate.sleep_ms);
-        gpio_put(LED_PIN, 0);
-        sleep_ms(gSlate.sleep_ms);
+        /* Blink on a gate rather than a sleep, so the loop keeps servicing
+           commands between edges. gSlate.sleep_ms is read fresh each pass,
+           so a new rate from the ground takes effect immediately. */
+        if (blink.ready(to_ms_since_boot(get_absolute_time()), gSlate.sleep_ms)) {
+            led_on = !led_on;
+            gpio_put(LED_PIN, led_on);
+        }
 
     } // while(true)
 
