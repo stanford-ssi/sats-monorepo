@@ -23,7 +23,7 @@ template <typename SlateT>
 class SlateWriter
 {
 public:
-    explicit SlateWriter(SlateT &slate) : slate_(slate) { }
+    explicit SlateWriter(SlateT &slate) : slate_(slate) {}
 
     /**
      * Apply one command and produce the reply to send back. Writes are
@@ -59,11 +59,11 @@ private:
     static std::size_t width_bytes(Width width)
     {
         switch (width) {
-        case Width_WIDTH_U8:  return 1;
+        case Width_WIDTH_U8: return 1;
         case Width_WIDTH_U16: return 2;
         case Width_WIDTH_U32: return 4;
         case Width_WIDTH_F32: return 4;
-        default:              return 0;
+        default: return 0;
         }
     }
 
@@ -91,14 +91,16 @@ private:
     template <typename T>
     void store(uint32_t offset, T value)
     {
-        std::memcpy(reinterpret_cast<uint8_t *>(&slate_) + offset, &value, sizeof(T));
+        std::memcpy(reinterpret_cast<uint8_t *>(&slate_) + offset, &value,
+                    sizeof(T));
     }
 
     template <typename T>
     T load(uint32_t offset) const
     {
         T value{};
-        std::memcpy(&value, reinterpret_cast<const uint8_t *>(&slate_) + offset, sizeof(T));
+        std::memcpy(&value, reinterpret_cast<const uint8_t *>(&slate_) + offset,
+                    sizeof(T));
         return value;
     }
 
@@ -116,9 +118,7 @@ private:
         case Width_WIDTH_U16:
             store<uint16_t>(offset, static_cast<uint16_t>(value));
             break;
-        default:
-            store<uint32_t>(offset, value);
-            break;
+        default: store<uint32_t>(offset, value); break;
         }
 
         /* Read it back so the reply carries the truncated value the slate
@@ -161,9 +161,9 @@ private:
     uint32_t load_uint(uint32_t offset, Width width) const
     {
         switch (width) {
-        case Width_WIDTH_U8:  return load<uint8_t>(offset);
+        case Width_WIDTH_U8: return load<uint8_t>(offset);
         case Width_WIDTH_U16: return load<uint16_t>(offset);
-        default:              return load<uint32_t>(offset);
+        default: return load<uint32_t>(offset);
         }
     }
 

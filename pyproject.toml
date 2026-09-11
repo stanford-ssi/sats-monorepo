@@ -24,9 +24,30 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.16.7",
 ]
 
 [tool.pytest.ini_options]
 # The ground scripts are the only python in the tree; keep pytest out of
 # bazel-bin and friends.
 testpaths = ["scripts"]
+
+[tool.ruff]
+# 88 is ruff's default and the code already sits close to it; the C++ side
+# is at 80 because embedded code is read in narrower splits.
+line-length = 88
+# So that `import cobs` and friends are sorted as first party, not third.
+src = ["scripts", "src"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # outdated idioms
+    "B",   # bugbear: likely mistakes rather than style
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files deliberately import modules under test at odd angles.
+"scripts/tests/*" = ["E402"]

@@ -14,9 +14,9 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 cc_library(
     name = "blink_lib",
     hdrs = [
-        "apps/blink/src/slate.hpp",
+        "flight/blink/src/slate.hpp",
     ],
-    includes = ["apps/blink/src"],
+    includes = ["flight/blink/src"],
     deps = [
         "//common/cobs",
         "//common/util",
@@ -29,8 +29,8 @@ cc_library(
 
 cc_binary(
     name = "blink",
-    srcs = ["apps/blink/src/main.cpp"],
-    includes = ["apps/blink/src"],
+    srcs = ["flight/blink/src/main.cpp"],
+    includes = ["flight/blink/src"],
     copts = [
          "-Wall",
         "-Wextra",

@@ -61,7 +61,11 @@ def width_of(member: dict) -> int:
     size, type_name = member.get("size"), member.get("type", "")
     if "float" in type_name and size == 4:
         return Width.WIDTH_F32
-    for width, width_size in ((Width.WIDTH_U8, 1), (Width.WIDTH_U16, 2), (Width.WIDTH_U32, 4)):
+    for width, width_size in (
+        (Width.WIDTH_U8, 1),
+        (Width.WIDTH_U16, 2),
+        (Width.WIDTH_U32, 4),
+    ):
         if size == width_size:
             return width
     raise Unsupported(f"no command width for a {size} byte {type_name or '?'}")

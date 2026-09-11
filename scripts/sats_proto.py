@@ -35,12 +35,14 @@ def _compile_proto(proto: Path) -> Path:
     from grpc_tools import protoc  # slow import, skipped on a cache hit
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    code = protoc.main([
-        "protoc",
-        f"--proto_path={proto.parent}",
-        f"--python_out={out_dir}",
-        str(proto),
-    ])
+    code = protoc.main(
+        [
+            "protoc",
+            f"--proto_path={proto.parent}",
+            f"--python_out={out_dir}",
+            str(proto),
+        ]
+    )
     if code != 0:
         raise RuntimeError(f"protoc failed on {proto} (exit {code})")
     return generated

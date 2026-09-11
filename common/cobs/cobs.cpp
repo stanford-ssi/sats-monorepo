@@ -26,8 +26,7 @@ uint32_t cobs_encode(const void *data, uint32_t length, uint8_t *buffer)
     uint8_t *codep = encode++; // Output code pointer
     uint8_t code = 1;          // Code value
 
-    for (const uint8_t *byte = (const uint8_t *)data; length--; ++byte)
-    {
+    for (const uint8_t *byte = (const uint8_t *)data; length--; ++byte) {
         if (*byte) // Byte not zero, write it
             *encode++ = *byte, ++code;
 
@@ -57,12 +56,10 @@ uint32_t cobs_decode(const uint8_t *buffer, uint32_t length, void *data)
     const uint8_t *byte = buffer;      // Encoded input byte pointer
     uint8_t *decode = (uint8_t *)data; // Decoded output byte pointer
 
-    for (uint8_t code = 0xff, block = 0; byte < buffer + length; --block)
-    {
+    for (uint8_t code = 0xff, block = 0; byte < buffer + length; --block) {
         if (block) // Decode block byte
             *decode++ = *byte++;
-        else
-        {
+        else {
             block = *byte++; // Fetch the next block length
             if (block &&
                 (code != 0xff)) // Encoded zero, write it unless it's delimiter.

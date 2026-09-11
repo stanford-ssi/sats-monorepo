@@ -14,14 +14,13 @@
 #include "pb_encode.h"
 #include "proto/sats_command.pb.h"
 
-
-CmdResponder::CmdResponder(Queue<uint8_t> &out) :
-    out_(out) { }
+CmdResponder::CmdResponder(Queue<uint8_t> &out) : out_(out) {}
 
 bool CmdResponder::send(const SatResponse &rsp)
 {
     std::array<uint8_t, SatResponse_size> payload{};
-    pb_ostream_t stream = pb_ostream_from_buffer(payload.data(), payload.size());
+    pb_ostream_t stream =
+        pb_ostream_from_buffer(payload.data(), payload.size());
     if (!pb_encode(&stream, &SatResponse_msg, &rsp)) {
         return false;
     }

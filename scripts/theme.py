@@ -59,7 +59,9 @@ class Theme:
         """
         stream = stream or sys.stdout
         tty = hasattr(stream, "isatty") and stream.isatty()
-        color = tty and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb"
+        color = (
+            tty and not os.environ.get("NO_COLOR") and os.environ.get("TERM") != "dumb"
+        )
         encoding = (getattr(stream, "encoding", "") or "").lower()
         return cls(color=color, unicode=tty and "utf" in encoding)
 

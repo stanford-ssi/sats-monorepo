@@ -1,0 +1,40 @@
+name: Format
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  clang-format:
+    name: C++ formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned: clang-format's output drifts between major versions, so an
+      # unpinned one would fail on code that is correctly formatted locally.
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+
+      - name: Check formatting
+        run: |
+          files=$(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v rust_example)
+          clang-format-18 --style=file --dry-run --Werror $files
+
+  ruff:
+    name: Python formatting and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .

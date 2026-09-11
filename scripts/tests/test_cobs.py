@@ -16,14 +16,17 @@ def test_reference_vector():
     assert cobs.decode(REFERENCE_FRAME) == REFERENCE_PAYLOAD
 
 
-@pytest.mark.parametrize("payload", [
-    b"\x01",
-    b"\x01\x02\x03",
-    b"\x00\x01\x00\x02\x00",  # embedded zeros, including at both ends
-    bytes(range(1, 255)),  # exactly one full block
-    bytes([0xAB]) * 300,  # spills past the 254 byte block limit
-    bytes(range(256)) * 2,  # long, with zeros
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\x01",
+        b"\x01\x02\x03",
+        b"\x00\x01\x00\x02\x00",  # embedded zeros, including at both ends
+        bytes(range(1, 255)),  # exactly one full block
+        bytes([0xAB]) * 300,  # spills past the 254 byte block limit
+        bytes(range(256)) * 2,  # long, with zeros
+    ],
+)
 def test_round_trip(payload):
     assert cobs.decode(cobs.frame(payload)) == payload
     assert b"\x00" not in cobs.encode(payload)
@@ -41,7 +44,7 @@ def test_deframer_reassembles_across_chunks():
     deframer = cobs.Deframer()
     out = []
     for i in range(len(stream)):  # one byte at a time, the worst case
-        out += deframer.push(stream[i:i + 1])
+        out += deframer.push(stream[i : i + 1])
     assert out == [b"\x01\x00\x02", b"hello"]
 
 

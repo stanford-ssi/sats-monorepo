@@ -51,7 +51,8 @@ int main()
         /* Blink on a gate rather than a sleep, so the loop keeps servicing
            commands between edges. gSlate.sleep_ms is read fresh each pass,
            so a new rate from the ground takes effect immediately. */
-        if (blink.ready(to_ms_since_boot(get_absolute_time()), gSlate.sleep_ms)) {
+        if (blink.ready(to_ms_since_boot(get_absolute_time()),
+                        gSlate.sleep_ms)) {
             led_on = !led_on;
             gpio_put(LED_PIN, led_on);
         }

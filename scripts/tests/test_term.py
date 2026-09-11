@@ -8,7 +8,7 @@ from theme import Theme, visible_len
 CASES = [
     ("j", "j"),
     (":", ":"),
-    ("\x1b", "ESC"),          # a lone esc, not the start of a sequence
+    ("\x1b", "ESC"),  # a lone esc, not the start of a sequence
     ("\x1b[A", "UP"),
     ("\x1b[B", "DOWN"),
     ("\x1b[H", "HOME"),
@@ -19,10 +19,10 @@ CASES = [
     ("\n", "ENTER"),
     ("\x7f", "BACKSPACE"),
     ("\x08", "BACKSPACE"),
-    ("\x04", "\x04"),         # ctrl-d, App reads it raw
-    ("\x03", "q"),            # ctrl-c quits instead of raising
+    ("\x04", "\x04"),  # ctrl-d, App reads it raw
+    ("\x03", "q"),  # ctrl-c quits instead of raising
     ("", None),
-    ("\x1b[Z", None),         # shift-tab, nothing is bound to it
+    ("\x1b[Z", None),  # shift-tab, nothing is bound to it
 ]
 
 
@@ -53,13 +53,13 @@ def test_clip_strips_colour_before_truncating():
 
 
 SPLITS = [
-    (b"jj", "j", b"j"),                    # two keys in one read
-    (b"w137\r", "w", b"137\r"),            # a whole typed value at once
+    (b"jj", "j", b"j"),  # two keys in one read
+    (b"w137\r", "w", b"137\r"),  # a whole typed value at once
     (b"\x1b[A", "\x1b[A", b""),
-    (b"\x1b[Aj", "\x1b[A", b"j"),          # a sequence followed by a key
+    (b"\x1b[Aj", "\x1b[A", b"j"),  # a sequence followed by a key
     (b"\x1b[5~k", "\x1b[5~", b"k"),
     (b"\x1b", "\x1b", b""),
-    (b"\xc3\xa9x", "é", b"x"),             # utf-8 stays in one piece
+    (b"\xc3\xa9x", "é", b"x"),  # utf-8 stays in one piece
 ]
 
 

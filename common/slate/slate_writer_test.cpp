@@ -9,11 +9,13 @@
 
 #include "gtest/gtest.h"
 
-namespace {
+namespace
+{
 
 /* A stand in for the flight slate with one field of every width, laid out so
    the offsets below are stable. */
-struct TestSlate {
+struct TestSlate
+{
     uint8_t flag{};
     uint8_t mode{};
     uint16_t counter{};
@@ -86,7 +88,8 @@ uint32_t bits_of(float value)
     return bits;
 }
 
-class SlateWriterTest : public ::testing::Test {
+class SlateWriterTest : public ::testing::Test
+{
 protected:
     TestSlate slate_{};
     SlateWriter<TestSlate> writer_{slate_};
@@ -160,9 +163,14 @@ TEST_F(SlateWriterTest, ReadReturnsCurrentValues)
     slate_.sleep_ms = 250;
     slate_.temperature = -12.5f;
 
-    EXPECT_EQ(writer_.apply(read_field(kFlag, Width_WIDTH_U8)).value.uint_value, 7u);
-    EXPECT_EQ(writer_.apply(read_field(kCounter, Width_WIDTH_U16)).value.uint_value, 0x0102u);
-    EXPECT_EQ(writer_.apply(read_field(kSleepMs, Width_WIDTH_U32)).value.uint_value, 250u);
+    EXPECT_EQ(writer_.apply(read_field(kFlag, Width_WIDTH_U8)).value.uint_value,
+              7u);
+    EXPECT_EQ(
+        writer_.apply(read_field(kCounter, Width_WIDTH_U16)).value.uint_value,
+        0x0102u);
+    EXPECT_EQ(
+        writer_.apply(read_field(kSleepMs, Width_WIDTH_U32)).value.uint_value,
+        250u);
 
     SatResponse rsp = writer_.apply(read_field(kTemperature, Width_WIDTH_F32));
     EXPECT_EQ(rsp.which_value, SatResponse_float_value_tag);
@@ -183,8 +191,11 @@ TEST_F(SlateWriterTest, WriteThenReadRoundTrips)
     writer_.apply(write_u32(kSleepMs, 1000));
     writer_.apply(write_f32(kTemperature, 21.5f));
 
-    EXPECT_EQ(writer_.apply(read_field(kSleepMs, Width_WIDTH_U32)).value.uint_value, 1000u);
-    EXPECT_EQ(bits_of(writer_.apply(read_field(kTemperature, Width_WIDTH_F32)).value.float_value),
+    EXPECT_EQ(
+        writer_.apply(read_field(kSleepMs, Width_WIDTH_U32)).value.uint_value,
+        1000u);
+    EXPECT_EQ(bits_of(writer_.apply(read_field(kTemperature, Width_WIDTH_F32))
+                          .value.float_value),
               bits_of(21.5f));
 }
 
@@ -209,11 +220,15 @@ TEST_F(SlateWriterTest, OffsetPastTheEndIsRejected)
 {
     const TestSlate before = slate_;
 
-    /* One past the last byte, and the last byte of a u32 hanging off the end. */
-    EXPECT_EQ(writer_.apply(write_u8(sizeof(TestSlate), 1)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(write_u32(sizeof(TestSlate) - 3, 1)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(read_field(sizeof(TestSlate), Width_WIDTH_U8)).status,
+    /* One past the last byte, and the last byte of a u32 hanging off the end.
+     */
+    EXPECT_EQ(writer_.apply(write_u8(sizeof(TestSlate), 1)).status,
               Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_u32(sizeof(TestSlate) - 3, 1)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(
+        writer_.apply(read_field(sizeof(TestSlate), Width_WIDTH_U8)).status,
+        Status_STATUS_BAD_OFFSET);
 
     EXPECT_EQ(std::memcmp(&slate_, &before, sizeof(TestSlate)), 0);
 }
@@ -221,7 +236,8 @@ TEST_F(SlateWriterTest, OffsetPastTheEndIsRejected)
 TEST_F(SlateWriterTest, LastFieldIsStillAddressable)
 {
     /* The bound must not be off by one: the final u32 starts at size - 4. */
-    SatResponse rsp = writer_.apply(write_u32(sizeof(TestSlate) - 4, 0xa5a5a5a5));
+    SatResponse rsp =
+        writer_.apply(write_u32(sizeof(TestSlate) - 4, 0xa5a5a5a5));
 
     EXPECT_EQ(rsp.status, Status_STATUS_OK);
     EXPECT_EQ(bits_of(slate_.temperature), 0xa5a5a5a5u);
@@ -231,9 +247,12 @@ TEST_F(SlateWriterTest, OffsetNearUint32MaxDoesNotWrap)
 {
     /* offset + width would wrap to a small number and sneak past a naive
        bounds check; offset <= sizeof - width does not. */
-    EXPECT_EQ(writer_.apply(write_u32(0xffffffff, 1)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(write_u8(0xffffffff, 1)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(write_f32(0xfffffffc, 1.0f)).status, Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_u32(0xffffffff, 1)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_u8(0xffffffff, 1)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_f32(0xfffffffc, 1.0f)).status,
+              Status_STATUS_BAD_OFFSET);
     EXPECT_EQ(writer_.apply(read_field(0xffffffff, Width_WIDTH_U32)).status,
               Status_STATUS_BAD_OFFSET);
 }
@@ -242,10 +261,14 @@ TEST_F(SlateWriterTest, MisalignedOffsetsAreRejected)
 {
     const TestSlate before = slate_;
 
-    EXPECT_EQ(writer_.apply(write_u16(1, 0xabcd)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(write_u32(2, 0xabcd)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(write_f32(kTemperature + 1, 1.0f)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer_.apply(read_field(1, Width_WIDTH_U32)).status, Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_u16(1, 0xabcd)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_u32(2, 0xabcd)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(write_f32(kTemperature + 1, 1.0f)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer_.apply(read_field(1, Width_WIDTH_U32)).status,
+              Status_STATUS_BAD_OFFSET);
 
     EXPECT_EQ(std::memcmp(&slate_, &before, sizeof(TestSlate)), 0);
 }
@@ -261,12 +284,17 @@ TEST_F(SlateWriterTest, FailureStillEchoesOffsetAndWidth)
 TEST(SlateWriterTinySlateTest, WidthLargerThanTheSlateIsRejected)
 {
     /* sizeof(SlateT) - width underflows here unless it is guarded. */
-    struct Tiny { uint8_t only; };
+    struct Tiny
+    {
+        uint8_t only;
+    };
     Tiny slate{};
     SlateWriter<Tiny> writer{slate};
 
-    EXPECT_EQ(writer.apply(write_u32(0, 0xffffffff)).status, Status_STATUS_BAD_OFFSET);
-    EXPECT_EQ(writer.apply(read_field(0, Width_WIDTH_F32)).status, Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer.apply(write_u32(0, 0xffffffff)).status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(writer.apply(read_field(0, Width_WIDTH_F32)).status,
+              Status_STATUS_BAD_OFFSET);
     EXPECT_EQ(slate.only, 0);
 }
 

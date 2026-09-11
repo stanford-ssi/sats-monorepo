@@ -12,12 +12,12 @@ Notes:
       translation units), all matches are printed.
 """
 
-import sys
-import json
 import argparse
+import json
+import sys
 
-from elftools.elf.elffile import ELFFile
 from elftools.dwarf.die import DIE
+from elftools.elf.elffile import ELFFile
 
 
 def type_name(die: DIE) -> str:
@@ -39,15 +39,27 @@ def type_name(die: DIE) -> str:
         return f"{prefix} {name.value.decode()}" if name else f"{prefix} <anonymous>"
 
     if tag == "DW_TAG_pointer_type":
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         return f"{type_name(target)} *"
 
     if tag == "DW_TAG_const_type":
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         return f"const {type_name(target)}"
 
     if tag == "DW_TAG_volatile_type":
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         return f"volatile {type_name(target)}"
 
     if tag == "DW_TAG_typedef":
@@ -55,10 +67,17 @@ def type_name(die: DIE) -> str:
         return name.value.decode() if name else "typedef"
 
     if tag == "DW_TAG_array_type":
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         count = None
         for child in die.iter_children():
-            if child.tag == "DW_TAG_subrange_type" and "DW_AT_upper_bound" in child.attributes:
+            if (
+                child.tag == "DW_TAG_subrange_type"
+                and "DW_AT_upper_bound" in child.attributes
+            ):
                 count = child.attributes["DW_AT_upper_bound"].value + 1
         suffix = f"[{count}]" if count is not None else "[]"
         return f"{type_name(target)} {suffix}"
@@ -74,14 +93,25 @@ def die_byte_size(die: DIE):
     if die.tag in ("DW_TAG_pointer_type",):
         return 8  # assume 64-bit target unless overridden
     if die.tag in ("DW_TAG_const_type", "DW_TAG_volatile_type", "DW_TAG_typedef"):
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         return die_byte_size(target)
     if die.tag == "DW_TAG_array_type":
-        target = die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+        target = (
+            die.get_DIE_from_attribute("DW_AT_type")
+            if "DW_AT_type" in die.attributes
+            else None
+        )
         elem_size = die_byte_size(target)
         count = None
         for child in die.iter_children():
-            if child.tag == "DW_TAG_subrange_type" and "DW_AT_upper_bound" in child.attributes:
+            if (
+                child.tag == "DW_TAG_subrange_type"
+                and "DW_AT_upper_bound" in child.attributes
+            ):
                 count = child.attributes["DW_AT_upper_bound"].value + 1
         if elem_size is not None and count is not None:
             return elem_size * count
@@ -112,17 +142,27 @@ AGGREGATE_TAGS = ("DW_TAG_structure_type", "DW_TAG_class_type", "DW_TAG_union_ty
 
 def target_type(die: DIE):
     """The DIE a type or member points at, if it points at one."""
-    return die.get_DIE_from_attribute("DW_AT_type") if "DW_AT_type" in die.attributes else None
+    return (
+        die.get_DIE_from_attribute("DW_AT_type")
+        if "DW_AT_type" in die.attributes
+        else None
+    )
 
 
 def strip_qualifiers(die: DIE):
     """Peel typedefs and cv qualifiers off until a type with a layout is left."""
-    while die is not None and die.tag in ("DW_TAG_typedef", "DW_TAG_const_type", "DW_TAG_volatile_type"):
+    while die is not None and die.tag in (
+        "DW_TAG_typedef",
+        "DW_TAG_const_type",
+        "DW_TAG_volatile_type",
+    ):
         die = target_type(die)
     return die
 
 
-def struct_members(die: DIE, flatten: bool = False, prefix: str = "", base: int = 0) -> list:
+def struct_members(
+    die: DIE, flatten: bool = False, prefix: str = "", base: int = 0
+) -> list:
     """Field records for a struct's members, with offsets relative to `base`.
 
     With `flatten`, a member that is itself a struct is replaced by its own
@@ -151,12 +191,14 @@ def struct_members(die: DIE, flatten: bool = False, prefix: str = "", base: int 
                 fields += nested
                 continue
 
-        fields.append({
-            "name": prefix + name,
-            "offset": offset,
-            "size": die_byte_size(ftype_die),
-            "type": type_name(ftype_die),
-        })
+        fields.append(
+            {
+                "name": prefix + name,
+                "offset": offset,
+                "size": die_byte_size(ftype_die),
+                "type": type_name(ftype_die),
+            }
+        )
 
     return fields
 
@@ -184,21 +226,33 @@ def get_struct_layout(elf_path: str, struct_name: str, flatten: bool = True) -> 
 
         result = dump_struct(matches[0], flatten)  # first match
 
-    return {f["name"]: {"offset": f["offset"], "size": f["size"], "type": f["type"]} for f in result["fields"]}
+    return {
+        f["name"]: {"offset": f["offset"], "size": f["size"], "type": f["type"]}
+        for f in result["fields"]
+    }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dump struct layout from ELF DWARF info")
+    parser = argparse.ArgumentParser(
+        description="Dump struct layout from ELF DWARF info"
+    )
     parser.add_argument("elf_path")
     parser.add_argument("struct_name")
-    parser.add_argument("--json", action="store_true", help="output as JSON instead of a table")
-    parser.add_argument("--flat", action="store_true", help="expand nested structs into dotted members")
+    parser.add_argument(
+        "--json", action="store_true", help="output as JSON instead of a table"
+    )
+    parser.add_argument(
+        "--flat", action="store_true", help="expand nested structs into dotted members"
+    )
     args = parser.parse_args()
 
     with open(args.elf_path, "rb") as f:
         elf = ELFFile(f)
         if not elf.has_dwarf_info():
-            print(f"error: {args.elf_path} has no DWARF debug info (compile with -g)", file=sys.stderr)
+            print(
+                f"error: {args.elf_path} has no DWARF debug info (compile with -g)",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
         dwarf_info = elf.get_dwarf_info()
@@ -225,7 +279,10 @@ def main():
                 hole = field["offset"] - prev_end
                 print(f"    /* XXX {hole} byte hole */")
             fsize_str = field["size"] if field["size"] is not None else "?"
-            print(f"    {field['type']:<20} {field['name']:<20} /* offset {field['offset']:>4}  size {fsize_str} */")
+            print(
+                f"    {field['type']:<20} {field['name']:<20}"
+                f" /* offset {field['offset']:>4}  size {fsize_str} */"
+            )
             if field["size"] is not None:
                 prev_end = field["offset"] + field["size"]
         if size is not None and prev_end < size:

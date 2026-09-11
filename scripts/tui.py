@@ -21,8 +21,12 @@ from sats_proto import Status
 AUTO_STEP = 0.15
 
 HELP = (
-    ("w", "write"), ("r", "refresh"), ("a", "auto"),
-    ("j/k", "move"), ("g/G", "ends"), ("q", "quit"),
+    ("w", "write"),
+    ("r", "refresh"),
+    ("a", "auto"),
+    ("j/k", "move"),
+    ("g/G", "ends"),
+    ("q", "quit"),
 )
 
 VALUE_W = 11
@@ -199,8 +203,13 @@ class App:
         would throw every column out of line.
         """
         name_w, type_w, value_w = self._widths()
-        return [f" {marker} ", f"{name:<{name_w}}", f"  {offset:>6}",
-                f"  {type_name:<{type_w}}", f"  {value:>{value_w}} "]
+        return [
+            f" {marker} ",
+            f"{name:<{name_w}}",
+            f"  {offset:>6}",
+            f"  {type_name:<{type_w}}",
+            f"  {value:>{value_w}} ",
+        ]
 
     def _inner_width(self) -> int:
         return sum(len(c) for c in self._cells(" ", "", "", "", ""))
@@ -221,8 +230,9 @@ class App:
         title = t(self.title, th.BOLD)
         subtitle = t(self.subtitle, th.DIM) if self.subtitle else ""
         left = t(t.box["tl"] + h + " ", th.DIM) + title + t(" ", th.DIM)
-        right = ((t(" ", th.DIM) + subtitle + t(" ", th.DIM)) if subtitle else "") \
-            + t(h + t.box["tr"], th.DIM)
+        right = ((t(" ", th.DIM) + subtitle + t(" ", th.DIM)) if subtitle else "") + t(
+            h + t.box["tr"], th.DIM
+        )
         fill = self._inner_width() - th.visible_len(left) - th.visible_len(right) + 2
         return left + t(h * max(0, fill), th.DIM) + right
 
@@ -230,8 +240,9 @@ class App:
         t = self.theme
         selected = i == self.cursor
         marker = t(t.marker, th.CYAN, th.BOLD) if selected else " "
-        cells = self._cells(marker, row.field.name, row.field.offset,
-                            row.field.type_name, row.value)
+        cells = self._cells(
+            marker, row.field.name, row.field.offset, row.field.type_name, row.value
+        )
 
         if row.error:
             value = t(cells[4], th.RED, th.BOLD)
@@ -241,8 +252,9 @@ class App:
             value = t(cells[4], th.GREEN)
 
         name = t(cells[1], th.BOLD) if selected else cells[1]
-        return self._framed(cells[0] + name + t(cells[2], th.DIM)
-                            + t(cells[3], th.DIM) + value)
+        return self._framed(
+            cells[0] + name + t(cells[2], th.DIM) + t(cells[3], th.DIM) + value
+        )
 
     def _header_line(self) -> str:
         cells = self._cells(" ", "field", "offset", "type", "value")
@@ -251,8 +263,13 @@ class App:
     def _prompt_line(self) -> str:
         t = self.theme
         if self.mode == "write":
-            return ("  " + t(self.row.field.name, th.BOLD) + t(" = ", th.DIM)
-                    + self.buffer + t(t.caret, th.CYAN))
+            return (
+                "  "
+                + t(self.row.field.name, th.BOLD)
+                + t(" = ", th.DIM)
+                + self.buffer
+                + t(t.caret, th.CYAN)
+            )
         if self.mode == "command":
             return "  " + t(":", th.DIM) + self.buffer + t(t.caret, th.CYAN)
         if not self.message:

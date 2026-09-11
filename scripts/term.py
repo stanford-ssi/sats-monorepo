@@ -19,7 +19,7 @@ import sys
 import termios
 import tty
 
-from theme import visible_len, ANSI
+from theme import ANSI, visible_len
 
 HIDE_CURSOR = "\x1b[?25l"
 SHOW_CURSOR = "\x1b[?25h"
@@ -32,21 +32,32 @@ CLEAR_BELOW = "\x1b[J"
 ESC_TIMEOUT = 0.03
 
 ESCAPES = {
-    "[A": "UP", "[B": "DOWN", "[C": "RIGHT", "[D": "LEFT",
-    "[H": "HOME", "[F": "END", "[5~": "PGUP", "[6~": "PGDN",
-    "OH": "HOME", "OF": "END",
+    "[A": "UP",
+    "[B": "DOWN",
+    "[C": "RIGHT",
+    "[D": "LEFT",
+    "[H": "HOME",
+    "[F": "END",
+    "[5~": "PGUP",
+    "[6~": "PGDN",
+    "OH": "HOME",
+    "OF": "END",
 }
 
 CONTROL = {
-    "\r": "ENTER", "\n": "ENTER",
-    "\x7f": "BACKSPACE", "\x08": "BACKSPACE",
+    "\r": "ENTER",
+    "\n": "ENTER",
+    "\x7f": "BACKSPACE",
+    "\x08": "BACKSPACE",
     "\x03": "q",  # ctrl-c reads as quit rather than a traceback
 }
 
 
 # One keystroke: a csi/ss3 escape sequence, or a single character with any
 # utf-8 continuation bytes that belong to it.
-KEYSTROKE = re.compile(rb"\x1b(?:\[[0-9;]*[A-Za-z~]|O[A-Za-z])|[\x00-\x7f]|[\xc0-\xff][\x80-\xbf]*")
+KEYSTROKE = re.compile(
+    rb"\x1b(?:\[[0-9;]*[A-Za-z~]|O[A-Za-z])|[\x00-\x7f]|[\xc0-\xff][\x80-\xbf]*"
+)
 
 
 def next_key(pending: bytes) -> tuple[str, bytes]:
@@ -59,7 +70,7 @@ def next_key(pending: bytes) -> tuple[str, bytes]:
     match = KEYSTROKE.match(pending)
     if not match:
         return "", pending[1:]  # an unusable leading byte, drop it
-    return match.group().decode("utf8", "replace"), pending[match.end():]
+    return match.group().decode("utf8", "replace"), pending[match.end() :]
 
 
 def decode(seq: str) -> str | None:

@@ -130,7 +130,9 @@ def autodetect_port() -> str:
 
     ports = [p for p in list_ports.comports() if p.vid == RASPBERRY_PI_VID]
     if not ports:
-        raise SystemExit("error: no raspberry pi usb device found, pass --port explicitly")
+        raise SystemExit(
+            "error: no raspberry pi usb device found, pass --port explicitly"
+        )
     if len(ports) > 1:
         found = ", ".join(p.device for p in ports)
         raise SystemExit(f"error: several candidates ({found}), pass --port")

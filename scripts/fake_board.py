@@ -116,5 +116,9 @@ class FakeBoard:
             response.uint_value = value
         return response.SerializeToString()
 
-    def _error(self, status: int, offset: int = 0, width: int = Width.WIDTH_UNSPECIFIED) -> bytes:
-        return SatResponse(status=status, offset=offset, width=width).SerializeToString()
+    def _error(
+        self, status: int, offset: int = 0, width: int = Width.WIDTH_UNSPECIFIED
+    ) -> bytes:
+        return SatResponse(
+            status=status, offset=offset, width=width
+        ).SerializeToString()

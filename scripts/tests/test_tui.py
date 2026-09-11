@@ -171,9 +171,9 @@ def test_render_has_a_row_per_field_and_a_cursor(app):
 def test_every_boxed_line_is_the_same_width(app):
     """Ragged borders are the most obvious way for this to look broken."""
     app.refresh()
-    boxed = [l for l in app.render() if l.startswith(("+", "|"))]
+    boxed = [line for line in app.render() if line.startswith(("+", "|"))]
     assert len(boxed) == len(app.rows) + 3  # top, header, rows, bottom
-    assert len({visible_len(l) for l in boxed}) == 1
+    assert len({visible_len(line) for line in boxed}) == 1
 
 
 def test_the_footer_never_overhangs_the_box(app):
@@ -190,8 +190,10 @@ def test_colour_does_not_disturb_the_layout(app):
     coloured = app.render()
 
     assert coloured != plain  # colour really is on
-    assert [visible_len(l) for l in coloured] == [visible_len(l) for l in plain]
-    assert [ANSI.sub("", l) for l in coloured] == plain
+    assert [visible_len(line) for line in coloured] == [
+        visible_len(line) for line in plain
+    ]
+    assert [ANSI.sub("", line) for line in coloured] == plain
 
 
 def test_a_refused_field_is_marked_as_an_error(app):
@@ -199,7 +201,7 @@ def test_a_refused_field_is_marked_as_an_error(app):
     row = {r.field.name: r for r in app.rows}["wrong"]  # misaligned offset
     assert row.error
     app.theme = Theme(color=True, unicode=False)
-    line = [l for l in app.render() if "wrong" in ANSI.sub("", l)][0]
+    line = [line for line in app.render() if "wrong" in ANSI.sub("", line)][0]
     assert RED in line
 
 

@@ -1,0 +1,50 @@
+# Derived from the style already in this tree rather than picked off a
+# shelf: functions, classes and structs put their opening brace on the
+# next line, control statements keep it on the same one.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+ColumnLimit: 80
+UseTab: Never
+AccessModifierOffset: -4
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterControlStatement: Never
+  AfterCaseLabel: false
+  BeforeElse: false
+  BeforeCatch: false
+  BeforeWhile: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+# `uint8_t *ptr` and `Queue<uint8_t> &out`, as the existing code writes them.
+DerivePointerAlignment: false
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# Keep `template <...>` on its own line above the class it belongs to.
+AlwaysBreakTemplateDeclarations: Yes
+
+# Only genuinely empty bodies get folded up. Anything the author chose to
+# write across several lines stays that way.
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+IndentCaseLabels: false
+
+# Includes are grouped by hand here (libc, then nanopb, then in-repo) and
+# some of those groups have to stay in order, so leave them alone.
+SortIncludes: false
+
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false

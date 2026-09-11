@@ -26,7 +26,13 @@ import cobs
 import theme
 import tui
 from fake_board import FakeBoard
-from link import Link, LoopbackTransport, NullTransport, SerialTransport, autodetect_port
+from link import (
+    Link,
+    LoopbackTransport,
+    NullTransport,
+    SerialTransport,
+    autodetect_port,
+)
 from parse_slate import get_struct_layout
 from protocol import fields_from_layout, format_value, parse_value, read_cmd, write_cmd
 
@@ -48,7 +54,11 @@ def resolve_elf(elf: str) -> str:
     try:
         out = subprocess.run(
             ["bazel", "cquery", "--config=pico", "--output=files", "//:blink"],
-            capture_output=True, text=True, timeout=300, check=True)
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=True,
+        )
     except (OSError, subprocess.SubprocessError):
         return elf  # no bazel, or no pico build yet; report the missing default
 
@@ -63,7 +73,7 @@ def discover(elf: str, struct_name: str):
     try:
         layout = get_struct_layout(elf, struct_name)
     except (FileNotFoundError, ValueError) as err:
-        raise SystemExit(f"error: {err}")
+        raise SystemExit(f"error: {err}") from None
 
     fields, skipped = fields_from_layout(layout)
     if not fields:
@@ -100,7 +110,7 @@ def run_headless(link: Link, fields: list, sets: list) -> None:
         try:
             ops.append((field, write_cmd(field, parse_value(text, field))))
         except ValueError as err:
-            raise SystemExit(f"error: {name}: {err}")
+            raise SystemExit(f"error: {name}: {err}") from None
     if not sets:
         ops = [(f, read_cmd(f)) for f in fields]
 
@@ -119,14 +129,29 @@ def print_layout(struct_name: str, fields: list) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    parser.add_argument("--elf", default=DEFAULT_ELF, help=f"firmware elf (default {DEFAULT_ELF})")
+    parser.add_argument(
+        "--elf", default=DEFAULT_ELF, help=f"firmware elf (default {DEFAULT_ELF})"
+    )
     parser.add_argument("--struct", default=DEFAULT_STRUCT, dest="struct_name")
     parser.add_argument("--port", help="serial port (autodetected if omitted)")
-    parser.add_argument("--fake", action="store_true", help="talk to an in process fake board")
-    parser.add_argument("--dry-run", action="store_true", help="print the frames instead of sending them")
-    parser.add_argument("--list", action="store_true", help="print the discovered fields and exit")
-    parser.add_argument("--set", action="append", default=[], metavar="FIELD=VALUE",
-                        help="write a field and exit, repeatable")
+    parser.add_argument(
+        "--fake", action="store_true", help="talk to an in process fake board"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the frames instead of sending them",
+    )
+    parser.add_argument(
+        "--list", action="store_true", help="print the discovered fields and exit"
+    )
+    parser.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        metavar="FIELD=VALUE",
+        help="write a field and exit, repeatable",
+    )
     args = parser.parse_args()
 
     fields = discover(resolve_elf(args.elf), args.struct_name)
@@ -139,8 +164,13 @@ def main() -> None:
         if args.dry_run or args.set:
             run_headless(link, fields, args.set)
         else:
-            app = tui.App(fields, link, theme=theme.Theme.detect(),
-                          title=args.struct_name, subtitle=where)
+            app = tui.App(
+                fields,
+                link,
+                theme=theme.Theme.detect(),
+                title=args.struct_name,
+                subtitle=where,
+            )
             tui.main(app)
     finally:
         link.close()

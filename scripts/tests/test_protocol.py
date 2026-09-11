@@ -20,12 +20,15 @@ U32 = Field("sleep_ms", 0, Width.WIDTH_U32)
 F32 = Field("temperature", 4, Width.WIDTH_F32)
 
 
-@pytest.mark.parametrize("field, value, variant", [
-    (U8, 0xAB, "write_u8"),
-    (U16, 0xBEEF, "write_u16"),
-    (U32, 0xDEADBEEF, "write_u32"),
-    (F32, 36.5, "write_f32"),
-])
+@pytest.mark.parametrize(
+    "field, value, variant",
+    [
+        (U8, 0xAB, "write_u8"),
+        (U16, 0xBEEF, "write_u16"),
+        (U32, 0xDEADBEEF, "write_u32"),
+        (F32, 36.5, "write_f32"),
+    ],
+)
 def test_write_round_trip(field, value, variant):
     cmd = SatCmd.FromString(write_cmd(field, value).SerializeToString())
     assert cmd.WhichOneof("cmd") == variant
@@ -60,13 +63,17 @@ def test_read_of_offset_zero_still_makes_a_frame():
     assert SatCmd.FromString(payload).read.width == Width.WIDTH_U8
 
 
-@pytest.mark.parametrize("field, value", [(U8, 256), (U16, 1 << 16), (U32, 1 << 32), (U8, -1)])
+@pytest.mark.parametrize(
+    "field, value", [(U8, 256), (U16, 1 << 16), (U32, 1 << 32), (U8, -1)]
+)
 def test_out_of_range_writes_are_refused(field, value):
     with pytest.raises(ValueError):
         write_cmd(field, value)
 
 
-@pytest.mark.parametrize("text, expected", [("32", 32), ("0x20", 32), ("0b101", 5), (" 7 ", 7)])
+@pytest.mark.parametrize(
+    "text, expected", [("32", 32), ("0x20", 32), ("0b101", 5), (" 7 ", 7)]
+)
 def test_parse_integer_literals(text, expected):
     assert parse_value(text, U32) == expected
 
@@ -77,22 +84,28 @@ def test_parse_float():
         parse_value("nonsense", F32)
 
 
-@pytest.mark.parametrize("member, width", [
-    ({"size": 1, "type": "uint8_t"}, Width.WIDTH_U8),
-    ({"size": 2, "type": "uint16_t"}, Width.WIDTH_U16),
-    ({"size": 4, "type": "uint32_t"}, Width.WIDTH_U32),
-    ({"size": 4, "type": "float"}, Width.WIDTH_F32),
-    ({"size": 1, "type": "bool"}, Width.WIDTH_U8),
-])
+@pytest.mark.parametrize(
+    "member, width",
+    [
+        ({"size": 1, "type": "uint8_t"}, Width.WIDTH_U8),
+        ({"size": 2, "type": "uint16_t"}, Width.WIDTH_U16),
+        ({"size": 4, "type": "uint32_t"}, Width.WIDTH_U32),
+        ({"size": 4, "type": "float"}, Width.WIDTH_F32),
+        ({"size": 1, "type": "bool"}, Width.WIDTH_U8),
+    ],
+)
 def test_width_of_member(member, width):
     assert width_of(member) == width
 
 
-@pytest.mark.parametrize("member", [
-    {"size": 8, "type": "double"},
-    {"size": None, "type": "struct Thing"},
-    {"size": 3, "type": "char [3]"},
-])
+@pytest.mark.parametrize(
+    "member",
+    [
+        {"size": 8, "type": "double"},
+        {"size": None, "type": "struct Thing"},
+        {"size": 3, "type": "char [3]"},
+    ],
+)
 def test_unaddressable_members_are_rejected(member):
     with pytest.raises(Unsupported):
         width_of(member)

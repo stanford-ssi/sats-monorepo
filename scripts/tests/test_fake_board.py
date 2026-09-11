@@ -22,11 +22,14 @@ def link():
     return link
 
 
-@pytest.mark.parametrize("field, value", [
-    (SLEEP_MS, 500),
-    (TEMPERATURE, 36.5),
-    (MODE, 0xAB),
-])
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        (SLEEP_MS, 500),
+        (TEMPERATURE, 36.5),
+        (MODE, 0xAB),
+    ],
+)
 def test_write_then_read_back(link, field, value):
     """Encode, frame, transport, deframe, decode, and do it again backwards."""
     written = link.request(write_cmd(field, value))
@@ -53,12 +56,15 @@ def test_writes_do_not_disturb_neighbours(link):
     assert link.board.memory[17:20] == bytearray(3)
 
 
-@pytest.mark.parametrize("offset, width", [
-    (20, Width.WIDTH_U8),  # one past the end
-    (17, Width.WIDTH_U32),  # straddles the end
-    (2, Width.WIDTH_U32),  # misaligned
-    (1, Width.WIDTH_U16),  # misaligned
-])
+@pytest.mark.parametrize(
+    "offset, width",
+    [
+        (20, Width.WIDTH_U8),  # one past the end
+        (17, Width.WIDTH_U32),  # straddles the end
+        (2, Width.WIDTH_U32),  # misaligned
+        (1, Width.WIDTH_U16),  # misaligned
+    ],
+)
 def test_bad_offsets_are_rejected(link, offset, width):
     read = SatCmd()
     read.read.offset = offset

@@ -18,7 +18,8 @@
 #include "common/cobs/cobs.hpp"
 #include "common/util/ring_buffer.hpp"
 
-namespace {
+namespace
+{
 
 using UsbSim = RingBuffer<uint8_t, 1024>;
 
@@ -98,8 +99,8 @@ SatResponse float_response(uint32_t offset, float value)
 
 TEST(CmdResponderTest, RoundTripsAUintResponse)
 {
-    expect_round_trip(uint_response(Status_STATUS_OK, 8, Width_WIDTH_U32,
-                                    0xDEADBEEF));
+    expect_round_trip(
+        uint_response(Status_STATUS_OK, 8, Width_WIDTH_U32, 0xDEADBEEF));
 }
 
 TEST(CmdResponderTest, RoundTripsAFloatResponse)
@@ -139,8 +140,8 @@ TEST(CmdResponderTest, FramesAreDelimitedAndFreeOfZeros)
     UsbSim usb{};
     CmdResponder responder{usb};
 
-    ASSERT_TRUE(responder.send(uint_response(Status_STATUS_OK, 1,
-                                             Width_WIDTH_U16, 0)));
+    ASSERT_TRUE(
+        responder.send(uint_response(Status_STATUS_OK, 1, Width_WIDTH_U16, 0)));
 
     std::vector<uint8_t> wire;
     uint8_t c{};
@@ -160,10 +161,10 @@ TEST(CmdResponderTest, SendsSeveralResponsesInOrder)
     UsbSim usb{};
     CmdResponder responder{usb};
 
-    ASSERT_TRUE(responder.send(uint_response(Status_STATUS_OK, 1,
-                                             Width_WIDTH_U8, 11)));
-    ASSERT_TRUE(responder.send(uint_response(Status_STATUS_OK, 2,
-                                             Width_WIDTH_U8, 22)));
+    ASSERT_TRUE(
+        responder.send(uint_response(Status_STATUS_OK, 1, Width_WIDTH_U8, 11)));
+    ASSERT_TRUE(
+        responder.send(uint_response(Status_STATUS_OK, 2, Width_WIDTH_U8, 22)));
 
     std::optional<SatResponse> first = recv_response(usb);
     std::optional<SatResponse> second = recv_response(usb);
@@ -180,8 +181,8 @@ TEST(CmdResponderTest, ReportsAFullQueueAndCleansUpTheTornFrame)
     RingBuffer<uint8_t, 16> tiny{};
     CmdResponder responder{tiny};
 
-    const SatResponse rsp = uint_response(Status_STATUS_OK, 8,
-                                          Width_WIDTH_U32, 42);
+    const SatResponse rsp =
+        uint_response(Status_STATUS_OK, 8, Width_WIDTH_U32, 42);
     ASSERT_TRUE(responder.send(rsp));
     EXPECT_FALSE(responder.send(rsp));
 

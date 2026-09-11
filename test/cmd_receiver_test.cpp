@@ -17,7 +17,8 @@
 #include "common/cobs/cobs.hpp"
 #include "common/util/ring_buffer.hpp"
 
-namespace {
+namespace
+{
 
 using UsbSim = RingBuffer<uint8_t, 1024>;
 

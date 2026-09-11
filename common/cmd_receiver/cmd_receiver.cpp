@@ -1,6 +1,6 @@
 /**
  * Author: Carson Lauer
- * Date: 8 September 2026 
+ * Date: 8 September 2026
  */
 #include "cmd_receiver.hpp"
 
@@ -10,16 +10,13 @@
 #include "pb_decode.h"
 #include "proto/sats_command.pb.h"
 
-
-CmdReceiver::CmdReceiver(Queue<uint8_t>& in) :
-    in_(in) { }
+CmdReceiver::CmdReceiver(Queue<uint8_t> &in) : in_(in) {}
 
 uint32_t CmdReceiver::update()
 {
     uint32_t cmds = 0;
     uint8_t c{};
-    while (in_.pop(c))
-    {
+    while (in_.pop(c)) {
         /* Zero never appears inside an encoded frame, so it delimits one. */
         if (c == 0) {
             if (finish_frame()) {

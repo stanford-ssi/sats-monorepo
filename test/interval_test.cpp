@@ -4,14 +4,15 @@
 
 #include "common/util/interval.hpp"
 
-namespace {
+namespace
+{
 
 TEST(IntervalTest, FiresOncePerPeriod)
 {
     Interval gate{};
 
-    EXPECT_FALSE(gate.ready(5, 10));   // not yet
-    EXPECT_TRUE(gate.ready(10, 10));   // exactly on the boundary
+    EXPECT_FALSE(gate.ready(5, 10)); // not yet
+    EXPECT_TRUE(gate.ready(10, 10)); // exactly on the boundary
     EXPECT_FALSE(gate.ready(19, 10));
     EXPECT_TRUE(gate.ready(20, 10));
 }

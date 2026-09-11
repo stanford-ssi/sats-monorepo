@@ -33,6 +33,11 @@ def test_response_variants():
 
 def test_enum_values():
     assert Width.WIDTH_UNSPECIFIED == 0  # the default, and never addressable
-    assert [Width.WIDTH_U8, Width.WIDTH_U16, Width.WIDTH_U32, Width.WIDTH_F32] == [1, 2, 3, 4]
+    assert [Width.WIDTH_U8, Width.WIDTH_U16, Width.WIDTH_U32, Width.WIDTH_F32] == [
+        1,
+        2,
+        3,
+        4,
+    ]
     assert Status.STATUS_OK == 1
     assert Status.Name(Status.STATUS_BAD_OFFSET) == "STATUS_BAD_OFFSET"

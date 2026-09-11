@@ -33,7 +33,9 @@ def elf(tmp_path_factory):
         pytest.skip("no host compiler to build the dwarf fixture with")
     path = tmp_path_factory.mktemp("dwarf")
     (path / "slate.cpp").write_text(SOURCE)
-    subprocess.run(["g++", "-g", "-c", "slate.cpp", "-o", "slate.o"], cwd=path, check=True)
+    subprocess.run(
+        ["g++", "-g", "-c", "slate.cpp", "-o", "slate.o"], cwd=path, check=True
+    )
     return str(path / "slate.o")
 
 
