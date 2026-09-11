@@ -4,6 +4,11 @@ import pytest
 
 import cobs
 from protocol import (
+    DW_ATE_BOOLEAN,
+    DW_ATE_FLOAT,
+    DW_ATE_SIGNED,
+    DW_ATE_SIGNED_CHAR,
+    DW_ATE_UNSIGNED,
     Field,
     Unsupported,
     format_value,
@@ -232,3 +237,75 @@ def test_bool_formats_as_a_word_not_a_number():
             bool_value=value,
         )
         assert format_value(rsp) == expected
+
+
+I8 = Field("trim", 0, Width.WIDTH_I8)
+I16 = Field("offset_hz", 0, Width.WIDTH_I16)
+I32 = Field("drift", 0, Width.WIDTH_I32)
+
+
+def test_signed_fields_report_signed_limits():
+    assert I8.limits == (-128, 127)
+    assert I16.limits == (-32768, 32767)
+    assert I32.limits == (-2147483648, 2147483647)
+    assert U32.limits == (0, 4294967295)
+    assert I32.is_signed and not U32.is_signed
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [("-1", -1), ("0", 0), ("127", 127), ("-128", -128), ("-0x10", -16)],
+)
+def test_signed_input(text, expected):
+    assert parse_value(text, I8) == expected
+
+
+@pytest.mark.parametrize("text", ["128", "-129", "1000"])
+def test_signed_input_out_of_range_is_refused(text):
+    with pytest.raises(ValueError, match="does not fit"):
+        parse_value(text, I8)
+
+
+def test_negative_input_is_still_refused_for_unsigned():
+    with pytest.raises(ValueError, match="does not fit"):
+        parse_value("-1", U32)
+
+
+def test_signed_writes_use_the_signed_variants():
+    for field, variant in ((I8, "write_i8"), (I16, "write_i16"), (I32, "write_i32")):
+        cmd = write_cmd(field, -5)
+        assert cmd.WhichOneof("cmd") == variant
+        assert getattr(cmd, variant).value == -5
+
+
+def test_a_negative_value_costs_few_bytes_on_the_wire():
+    """sint32 zigzags, so -1 is cheap. A plain int32 would sign extend it
+    into ten bytes of varint, which matters on a radio link."""
+    assert len(write_cmd(I32, -1).SerializeToString()) <= 6
+
+
+SIGNED_ENCODINGS = [
+    ({"size": 1, "type": "int8_t", "encoding": DW_ATE_SIGNED_CHAR}, Width.WIDTH_I8),
+    ({"size": 2, "type": "int16_t", "encoding": DW_ATE_SIGNED}, Width.WIDTH_I16),
+    ({"size": 4, "type": "int32_t", "encoding": DW_ATE_SIGNED}, Width.WIDTH_I32),
+    ({"size": 4, "type": "unsigned int", "encoding": DW_ATE_UNSIGNED}, Width.WIDTH_U32),
+    ({"size": 1, "type": "bool", "encoding": DW_ATE_BOOLEAN}, Width.WIDTH_BOOL),
+    ({"size": 4, "type": "float", "encoding": DW_ATE_FLOAT}, Width.WIDTH_F32),
+]
+
+
+@pytest.mark.parametrize("member,width", SIGNED_ENCODINGS)
+def test_encoding_decides_the_width(member, width):
+    """Size cannot tell a uint8 from an int8 from a bool, so the encoding
+    is what the choice actually rests on."""
+    assert width_of(member) == width
+
+
+def test_encoding_beats_a_misleading_type_name():
+    member = {"size": 4, "type": "uint32_t", "encoding": DW_ATE_SIGNED}
+    assert width_of(member) == Width.WIDTH_I32
+
+
+def test_a_layout_without_an_encoding_falls_back_to_the_name():
+    assert width_of({"size": 4, "type": "int32_t"}) == Width.WIDTH_I32
+    assert width_of({"size": 1, "type": "bool"}) == Width.WIDTH_BOOL

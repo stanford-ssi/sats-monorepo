@@ -15,6 +15,9 @@ enum Width {
   WIDTH_U32 = 3;
   WIDTH_F32 = 4;
   WIDTH_BOOL = 5; // one byte, but only 0 or 1 are meaningful
+  WIDTH_I8 = 6;
+  WIDTH_I16 = 7;
+  WIDTH_I32 = 8;
 }
 
 message WriteU8 {
@@ -37,6 +40,26 @@ message WriteF32 {
   float value = 2;
 }
 
+/*
+ * Signed writes carry sint32 rather than int32: zigzag keeps a small
+ * negative down to one byte, where a plain int32 sign extends -1 into ten
+ * bytes of varint. This link is a radio budget, not a socket.
+ */
+message WriteI8 {
+  uint32 offset = 1;
+  sint32 value = 2; // truncated to 8 bits
+}
+
+message WriteI16 {
+  uint32 offset = 1;
+  sint32 value = 2; // truncated to 16 bits
+}
+
+message WriteI32 {
+  uint32 offset = 1;
+  sint32 value = 2;
+}
+
 message WriteBool {
   uint32 offset = 1;
   bool value = 2;
@@ -56,6 +79,9 @@ message SatCmd {
     WriteF32 write_f32 = 4;
     ReadField read = 5;
     WriteBool write_bool = 6;
+    WriteI8 write_i8 = 7;
+    WriteI16 write_i16 = 8;
+    WriteI32 write_i32 = 9;
   }
 }
 
@@ -78,5 +104,6 @@ message SatResponse {
     uint32 uint_value = 4;
     float float_value = 5;
     bool bool_value = 6;
+    sint32 int_value = 7;
   }
 }

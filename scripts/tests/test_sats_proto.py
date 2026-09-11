@@ -22,6 +22,9 @@ def test_command_variants():
         "write_f32",
         "read",
         "write_bool",
+        "write_i8",
+        "write_i16",
+        "write_i32",
     ]
 
 
@@ -30,6 +33,7 @@ def test_response_variants():
         "uint_value",
         "float_value",
         "bool_value",
+        "int_value",
     }
 
 
@@ -43,6 +47,9 @@ def test_enum_values():
         Width.WIDTH_U32,
         Width.WIDTH_F32,
         Width.WIDTH_BOOL,
-    ] == [1, 2, 3, 4, 5]
+        Width.WIDTH_I8,
+        Width.WIDTH_I16,
+        Width.WIDTH_I32,
+    ] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert Status.STATUS_OK == 1
     assert Status.Name(Status.STATUS_BAD_OFFSET) == "STATUS_BAD_OFFSET"

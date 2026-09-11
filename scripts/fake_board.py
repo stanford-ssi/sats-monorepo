@@ -14,8 +14,16 @@ import struct
 from google.protobuf.message import DecodeError
 
 import cobs
-from protocol import WIDTH_BYTES
+from protocol import SIGNED, WIDTH_BYTES
 from sats_proto import SatCmd, SatResponse, Status, Width
+
+
+def _wrap_signed(value: int, size: int) -> int:
+    """Narrow to `size` bytes the way a c++20 static_cast does."""
+    bits = 8 * size
+    value &= (1 << bits) - 1
+    return value - (1 << bits) if value >= 1 << (bits - 1) else value
+
 
 # How each width is packed into slate memory, little endian like the rp2350.
 PACK = {
@@ -24,6 +32,9 @@ PACK = {
     Width.WIDTH_U32: "<I",
     Width.WIDTH_F32: "<f",
     Width.WIDTH_BOOL: "<B",  # stored as a byte, same as SlateWriter does
+    Width.WIDTH_I8: "<b",
+    Width.WIDTH_I16: "<h",
+    Width.WIDTH_I32: "<i",
 }
 
 # Which write variant carries which width.
@@ -33,6 +44,9 @@ WRITE_WIDTHS = {
     "write_u32": Width.WIDTH_U32,
     "write_f32": Width.WIDTH_F32,
     "write_bool": Width.WIDTH_BOOL,
+    "write_i8": Width.WIDTH_I8,
+    "write_i16": Width.WIDTH_I16,
+    "write_i32": Width.WIDTH_I32,
 }
 
 
@@ -80,6 +94,8 @@ class FakeBoard:
         value = body.value
         if width == Width.WIDTH_BOOL:
             value = 1 if value else 0  # normalised, as SlateWriter does
+        elif width in SIGNED:
+            value = _wrap_signed(value, WIDTH_BYTES[width])
         elif width != Width.WIDTH_F32:
             value &= (1 << (8 * WIDTH_BYTES[width])) - 1  # truncated to the width
         return self._write(body.offset, width, value)
@@ -116,6 +132,8 @@ class FakeBoard:
         response = SatResponse(status=Status.STATUS_OK, offset=offset, width=width)
         if width == Width.WIDTH_F32:
             response.float_value = value
+        elif width in SIGNED:
+            response.int_value = value
         elif width == Width.WIDTH_BOOL:
             # A byte other than 0 or 1 still reads back as true, which is
             # what load<uint8_t>(offset) != 0 does on the board.

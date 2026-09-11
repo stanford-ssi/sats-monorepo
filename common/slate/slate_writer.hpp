@@ -48,6 +48,15 @@ public:
                               cmd.cmd.write_u32.value);
         case SatCmd_write_f32_tag:
             return write_f32(cmd.cmd.write_f32.offset, cmd.cmd.write_f32.value);
+        case SatCmd_write_i8_tag:
+            return write_int(cmd.cmd.write_i8.offset, Width_WIDTH_I8,
+                             cmd.cmd.write_i8.value);
+        case SatCmd_write_i16_tag:
+            return write_int(cmd.cmd.write_i16.offset, Width_WIDTH_I16,
+                             cmd.cmd.write_i16.value);
+        case SatCmd_write_i32_tag:
+            return write_int(cmd.cmd.write_i32.offset, Width_WIDTH_I32,
+                             cmd.cmd.write_i32.value);
         case SatCmd_write_bool_tag:
             return write_bool(cmd.cmd.write_bool.offset,
                               cmd.cmd.write_bool.value);
@@ -71,6 +80,9 @@ private:
         case Width_WIDTH_U32: return 4;
         case Width_WIDTH_F32: return 4;
         case Width_WIDTH_BOOL: return sizeof(bool);
+        case Width_WIDTH_I8: return 1;
+        case Width_WIDTH_I16: return 2;
+        case Width_WIDTH_I32: return 4;
         default: return 0;
         }
     }
@@ -151,6 +163,28 @@ private:
         return read_field(offset, Width_WIDTH_BOOL);
     }
 
+    /* Narrowing a signed value is modular as of c++20, which is the wrap
+       the ground already assumes when it refuses out of range input. */
+    SatResponse write_int(uint32_t offset, Width width, int32_t value)
+    {
+        const std::size_t size = width_bytes(width);
+        if (!addressable(offset, size)) {
+            return reply(Status_STATUS_BAD_OFFSET, offset, width);
+        }
+
+        switch (width) {
+        case Width_WIDTH_I8:
+            store<int8_t>(offset, static_cast<int8_t>(value));
+            break;
+        case Width_WIDTH_I16:
+            store<int16_t>(offset, static_cast<int16_t>(value));
+            break;
+        default: store<int32_t>(offset, value); break;
+        }
+
+        return read_field(offset, width);
+    }
+
     SatResponse write_f32(uint32_t offset, float value)
     {
         if (!addressable(offset, sizeof(float))) {
@@ -179,11 +213,29 @@ private:
         } else if (width == Width_WIDTH_BOOL) {
             rsp.which_value = SatResponse_bool_value_tag;
             rsp.value.bool_value = load<uint8_t>(offset) != 0;
+        } else if (is_signed(width)) {
+            rsp.which_value = SatResponse_int_value_tag;
+            rsp.value.int_value = load_int(offset, width);
         } else {
             rsp.which_value = SatResponse_uint_value_tag;
             rsp.value.uint_value = load_uint(offset, width);
         }
         return rsp;
+    }
+
+    static bool is_signed(Width width)
+    {
+        return width == Width_WIDTH_I8 || width == Width_WIDTH_I16 ||
+               width == Width_WIDTH_I32;
+    }
+
+    int32_t load_int(uint32_t offset, Width width) const
+    {
+        switch (width) {
+        case Width_WIDTH_I8: return load<int8_t>(offset);
+        case Width_WIDTH_I16: return load<int16_t>(offset);
+        default: return load<int32_t>(offset);
+        }
     }
 
     uint32_t load_uint(uint32_t offset, Width width) const
