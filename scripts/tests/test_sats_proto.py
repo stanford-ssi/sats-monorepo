@@ -21,6 +21,7 @@ def test_command_variants():
         "write_u32",
         "write_f32",
         "read",
+        "write_bool",
     ]
 
 
@@ -28,16 +29,20 @@ def test_response_variants():
     assert {f.name for f in SatResponse.DESCRIPTOR.oneofs_by_name["value"].fields} == {
         "uint_value",
         "float_value",
+        "bool_value",
     }
 
 
 def test_enum_values():
     assert Width.WIDTH_UNSPECIFIED == 0  # the default, and never addressable
-    assert [Width.WIDTH_U8, Width.WIDTH_U16, Width.WIDTH_U32, Width.WIDTH_F32] == [
-        1,
-        2,
-        3,
-        4,
-    ]
+    # Pinned numbers: these go on the wire, so renumbering one silently
+    # would make old ground software talk nonsense to new firmware.
+    assert [
+        Width.WIDTH_U8,
+        Width.WIDTH_U16,
+        Width.WIDTH_U32,
+        Width.WIDTH_F32,
+        Width.WIDTH_BOOL,
+    ] == [1, 2, 3, 4, 5]
     assert Status.STATUS_OK == 1
     assert Status.Name(Status.STATUS_BAD_OFFSET) == "STATUS_BAD_OFFSET"

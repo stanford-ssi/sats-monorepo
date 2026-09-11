@@ -23,6 +23,7 @@ PACK = {
     Width.WIDTH_U16: "<H",
     Width.WIDTH_U32: "<I",
     Width.WIDTH_F32: "<f",
+    Width.WIDTH_BOOL: "<B",  # stored as a byte, same as SlateWriter does
 }
 
 # Which write variant carries which width.
@@ -31,6 +32,7 @@ WRITE_WIDTHS = {
     "write_u16": Width.WIDTH_U16,
     "write_u32": Width.WIDTH_U32,
     "write_f32": Width.WIDTH_F32,
+    "write_bool": Width.WIDTH_BOOL,
 }
 
 
@@ -76,7 +78,9 @@ class FakeBoard:
 
         width = WRITE_WIDTHS[variant]
         value = body.value
-        if width != Width.WIDTH_F32:
+        if width == Width.WIDTH_BOOL:
+            value = 1 if value else 0  # normalised, as SlateWriter does
+        elif width != Width.WIDTH_F32:
             value &= (1 << (8 * WIDTH_BYTES[width])) - 1  # truncated to the width
         return self._write(body.offset, width, value)
 
@@ -112,6 +116,10 @@ class FakeBoard:
         response = SatResponse(status=Status.STATUS_OK, offset=offset, width=width)
         if width == Width.WIDTH_F32:
             response.float_value = value
+        elif width == Width.WIDTH_BOOL:
+            # A byte other than 0 or 1 still reads back as true, which is
+            # what load<uint8_t>(offset) != 0 does on the board.
+            response.bool_value = bool(value)
         else:
             response.uint_value = value
         return response.SerializeToString()

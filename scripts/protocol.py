@@ -16,6 +16,7 @@ WIDTH_BYTES = {
     Width.WIDTH_U16: 2,
     Width.WIDTH_U32: 4,
     Width.WIDTH_F32: 4,
+    Width.WIDTH_BOOL: 1,
 }
 
 WIDTH_NAMES = {
@@ -23,6 +24,24 @@ WIDTH_NAMES = {
     Width.WIDTH_U16: "uint16",
     Width.WIDTH_U32: "uint32",
     Width.WIDTH_F32: "float",
+    Width.WIDTH_BOOL: "bool",
+}
+
+
+# What a human might reasonably type for a bool. `2` is not on the list on
+# purpose: a slate bool that is neither true nor false is a bug worth
+# seeing rather than something to accept silently.
+BOOL_WORDS = {
+    "true": True,
+    "false": False,
+    "1": True,
+    "0": False,
+    "on": True,
+    "off": False,
+    "yes": True,
+    "no": False,
+    "t": True,
+    "f": False,
 }
 
 
@@ -50,6 +69,10 @@ class Field:
     def is_float(self) -> bool:
         return self.width == Width.WIDTH_F32
 
+    @property
+    def is_bool(self) -> bool:
+        return self.width == Width.WIDTH_BOOL
+
 
 def width_of(member: dict) -> int:
     """Pick the command width for a member of a parse_slate layout.
@@ -59,6 +82,10 @@ def width_of(member: dict) -> int:
     which of the two a 4 byte member is.
     """
     size, type_name = member.get("size"), member.get("type", "")
+    # A bool is a byte, but writing 2 to one is meaningless, so the debug
+    # info's type name is what separates it from a uint8.
+    if type_name in ("bool", "_Bool") and size == 1:
+        return Width.WIDTH_BOOL
     if "float" in type_name and size == 4:
         return Width.WIDTH_F32
     for width, width_size in (
@@ -92,6 +119,11 @@ def read_cmd(field: Field) -> SatCmd:
 def write_cmd(field: Field, value) -> SatCmd:
     """A write of `value` to `field`, as the variant matching its width."""
     cmd = SatCmd()
+    if field.is_bool:
+        cmd.write_bool.offset = field.offset
+        cmd.write_bool.value = bool(value)
+        return cmd
+
     if field.is_float:
         cmd.write_f32.offset = field.offset
         cmd.write_f32.value = float(value)
@@ -119,6 +151,12 @@ def parse_value(text: str, field: Field):
     text = text.strip()
     if not text:
         raise ValueError("no value given")
+
+    if field.is_bool:
+        try:
+            return BOOL_WORDS[text.lower()]
+        except KeyError:
+            raise ValueError(f"{text!r} is not a bool (try true or false)") from None
 
     try:
         if field.is_float:
@@ -149,6 +187,8 @@ def format_value(response) -> str:
     value = response_value(response)
     if value is None:
         return "no value"
+    if response.width == Width.WIDTH_BOOL:
+        return "true" if value else "false"
     if response.width == Width.WIDTH_F32:
         return f"{value:g}"
     return str(value)

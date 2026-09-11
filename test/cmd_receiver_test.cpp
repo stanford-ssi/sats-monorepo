@@ -82,6 +82,15 @@ SatCmd write_f32(uint32_t offset, float value)
     return cmd;
 }
 
+SatCmd write_bool(uint32_t offset, bool value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_bool_tag;
+    cmd.cmd.write_bool.offset = offset;
+    cmd.cmd.write_bool.value = value;
+    return cmd;
+}
+
 SatCmd read_field(uint32_t offset, Width width)
 {
     SatCmd cmd = SatCmd_init_zero;
@@ -127,9 +136,10 @@ TEST(CmdReceiverTest, DecodesEveryVariant)
     send_cmd(usb, write_u16(8, 0xBEEF));
     send_cmd(usb, write_u32(12, 0xDEADBEEF));
     send_cmd(usb, write_f32(16, -2.5f));
-    send_cmd(usb, read_field(20, Width_WIDTH_F32));
+    send_cmd(usb, write_bool(20, true));
+    send_cmd(usb, read_field(24, Width_WIDTH_F32));
 
-    EXPECT_EQ(recv.update(), 5u);
+    EXPECT_EQ(recv.update(), 6u);
 
     std::optional<SatCmd> cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
@@ -157,8 +167,14 @@ TEST(CmdReceiverTest, DecodesEveryVariant)
 
     cmd = recv.get_cmd();
     ASSERT_TRUE(cmd.has_value());
+    EXPECT_EQ(cmd->which_cmd, SatCmd_write_bool_tag);
+    EXPECT_EQ(cmd->cmd.write_bool.offset, 20u);
+    EXPECT_TRUE(cmd->cmd.write_bool.value);
+
+    cmd = recv.get_cmd();
+    ASSERT_TRUE(cmd.has_value());
     EXPECT_EQ(cmd->which_cmd, SatCmd_read_tag);
-    EXPECT_EQ(cmd->cmd.read.offset, 20u);
+    EXPECT_EQ(cmd->cmd.read.offset, 24u);
     EXPECT_EQ(cmd->cmd.read.width, Width_WIDTH_F32);
 }
 

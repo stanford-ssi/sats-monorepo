@@ -14,6 +14,7 @@ enum Width {
   WIDTH_U16 = 2;
   WIDTH_U32 = 3;
   WIDTH_F32 = 4;
+  WIDTH_BOOL = 5; // one byte, but only 0 or 1 are meaningful
 }
 
 message WriteU8 {
@@ -36,6 +37,11 @@ message WriteF32 {
   float value = 2;
 }
 
+message WriteBool {
+  uint32 offset = 1;
+  bool value = 2;
+}
+
 /* Ask for the current contents of a field, answered with a SatResponse. */
 message ReadField {
   uint32 offset = 1;
@@ -49,6 +55,7 @@ message SatCmd {
     WriteU32 write_u32 = 3;
     WriteF32 write_f32 = 4;
     ReadField read = 5;
+    WriteBool write_bool = 6;
   }
 }
 
@@ -70,5 +77,6 @@ message SatResponse {
   oneof value {
     uint32 uint_value = 4;
     float float_value = 5;
+    bool bool_value = 6;
   }
 }

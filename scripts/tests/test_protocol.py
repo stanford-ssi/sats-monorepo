@@ -91,7 +91,10 @@ def test_parse_float():
         ({"size": 2, "type": "uint16_t"}, Width.WIDTH_U16),
         ({"size": 4, "type": "uint32_t"}, Width.WIDTH_U32),
         ({"size": 4, "type": "float"}, Width.WIDTH_F32),
-        ({"size": 1, "type": "bool"}, Width.WIDTH_U8),
+        # A bool is a byte, but it is not a uint8: the debug info's type
+        # name is what tells them apart.
+        ({"size": 1, "type": "bool"}, Width.WIDTH_BOOL),
+        ({"size": 1, "type": "_Bool"}, Width.WIDTH_BOOL),
     ],
 )
 def test_width_of_member(member, width):
@@ -165,3 +168,67 @@ def test_good_input_still_parses():
     assert parse_value("4294967295", u32) == 4294967295
     assert parse_value("36.5", Field("t", 0, Width.WIDTH_F32)) == 36.5
     assert parse_value("255", Field("m", 0, Width.WIDTH_U8)) == 255
+
+
+BOOL_FIELD = Field("enabled", 4, Width.WIDTH_BOOL)
+
+BOOL_INPUT = [
+    ("true", True),
+    ("false", False),
+    ("True", True),
+    ("FALSE", False),  # case is not the user's problem
+    ("1", True),
+    ("0", False),
+    ("on", True),
+    ("off", False),
+    ("yes", True),
+    ("no", False),
+    ("t", True),
+    ("f", False),
+    (" true ", True),  # stray whitespace
+]
+
+
+@pytest.mark.parametrize("text,expected", BOOL_INPUT)
+def test_bool_input(text, expected):
+    assert parse_value(text, BOOL_FIELD) is expected
+
+
+@pytest.mark.parametrize("text", ["2", "-1", "maybe", "", "truthy"])
+def test_bad_bool_input_is_refused(text):
+    """`2` is refused on purpose: a slate bool that is neither true nor
+    false is a bug worth seeing, not something to coerce."""
+    with pytest.raises(ValueError):
+        parse_value(text, BOOL_FIELD)
+
+
+def test_a_bool_field_is_one_byte_and_named_bool():
+    assert BOOL_FIELD.size == 1
+    assert BOOL_FIELD.type_name == "bool"
+    assert BOOL_FIELD.is_bool and not BOOL_FIELD.is_float
+
+
+def test_bool_write_uses_the_bool_variant():
+    cmd = write_cmd(BOOL_FIELD, True)
+    assert cmd.WhichOneof("cmd") == "write_bool"
+    assert cmd.write_bool.offset == 4
+    assert cmd.write_bool.value is True
+
+
+def test_a_false_bool_write_is_still_a_non_empty_frame():
+    """An all-default message encodes to zero bytes and the firmware drops
+    the resulting empty frame, so `enabled = false` at offset 0 has to
+    survive the oneof wrapper."""
+    cmd = write_cmd(Field("enabled", 0, Width.WIDTH_BOOL), False)
+    assert len(cmd.SerializeToString()) > 0
+
+
+def test_bool_formats_as_a_word_not_a_number():
+    for value, expected in ((True, "true"), (False, "false")):
+        rsp = SatResponse(
+            status=Status.STATUS_OK,
+            offset=4,
+            width=Width.WIDTH_BOOL,
+            bool_value=value,
+        )
+        assert format_value(rsp) == expected
