@@ -113,6 +113,17 @@ bazel test //...     # firmware and host c++
 uv run pytest        # ground tooling
 ```
 
+## Formatting
+
+``` bash
+bazel run //:format            # rewrite c++ with clang-format, python with ruff
+bazel run //:format -- --check # verify only, what CI runs
+```
+
+Only tracked files are formatted, so `git add` a new file before expecting
+it to be touched. C++ needs clang-format 18 on the path; its output drifts
+between major versions and CI pins that one.
+
 ## Run the CI checks locally
 
 ``` bash

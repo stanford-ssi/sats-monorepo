@@ -11,6 +11,27 @@ package(default_visibility = ["//visibility:public"])
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
+# ============================================================================
+# Formatting
+# ============================================================================
+
+# `bazel run //:format` to rewrite, `-- --check` to verify.
+sh_binary(
+    name = "format",
+    srcs = ["tools/format.sh"],
+)
+
+cc_library(
+    name = "common_lib",
+    deps = [
+        "//common/cobs",
+        "//common/util",
+        "//common/cmd_receiver",
+        "//common/cmd_responder",
+        "//common/slate",
+    ]
+)
+
 cc_library(
     name = "blink_lib",
     hdrs = [
@@ -18,12 +39,9 @@ cc_library(
     ],
     includes = ["flight/blink/src"],
     deps = [
-        "//common/cobs",
-        "//common/util",
-        "//common/cmd_receiver",
-        "//common/cmd_responder",
-        "//common/slate",
+        ":common_lib",
         "//hal:pico_hal",
+        "//proto:sats_command_nanopb",
     ]
 )
 
@@ -39,10 +57,6 @@ cc_binary(
         "-Wdouble-promotion",
         "-DCFG_TUD_CDC=2",
     ],
-    deps = [
-        ":blink_lib",
-        "//proto:sats_command_nanopb",
-        "@pico-sdk//src/rp2_common/pico_stdlib",
-    ],
+    deps = [":blink_lib"],
 )
 
