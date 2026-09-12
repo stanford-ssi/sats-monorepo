@@ -6,7 +6,7 @@ from fake_board import FakeBoard
 from link import Link, LoopbackTransport
 from protocol import Field
 from sats_proto import Width
-from theme import ANSI, RED, Theme, visible_len
+from theme import ANSI, GREEN, RED, Theme, visible_len
 from tui import App
 
 FIELDS = [
@@ -203,6 +203,115 @@ def test_a_refused_field_is_marked_as_an_error(app):
     app.theme = Theme(color=True, unicode=False)
     line = [line for line in app.render() if "wrong" in ANSI.sub("", line)][0]
     assert RED in line
+
+
+# -- enums ---------------------------------------------------------------
+
+MODE = Field(
+    "mode",
+    16,
+    Width.WIDTH_U8,
+    enumerators=((0, "BOOT"), (1, "NOMINAL"), (2, "SAFE")),
+    type_label="enum Mode",
+)
+
+ENUM_FIELDS = [Field("sleep_ms", 0, Width.WIDTH_U32), MODE]
+
+
+@pytest.fixture
+def enum_app():
+    board = FakeBoard(size=20)
+    board.poke(16, Width.WIDTH_U8, 1)  # NOMINAL
+    app = App(ENUM_FIELDS, Link(LoopbackTransport(board), timeout=0.05))
+    app.board = board
+    return app
+
+
+def hint(app):
+    """The hint line, which sits just under the box when there is one."""
+    lines = app.render()
+    below = max(i for i, line in enumerate(lines) if line.startswith("+")) + 1
+    # Under the box comes the hint if there is one, then the prompt and
+    # the footer; two lines left over means this row has no hint.
+    return lines[below].strip() if len(lines) - below == 3 else ""
+
+
+def test_an_enum_reads_back_as_its_name(enum_app):
+    enum_app.refresh()
+    assert values(enum_app)["mode"] == "NOMINAL"
+    assert "NOMINAL" in "\n".join(enum_app.render())
+
+
+def test_an_enum_can_be_written_by_name(enum_app):
+    keys(enum_app, "j", "w", "S", "A", "F", "E", "ENTER")
+    assert enum_app.board.memory[16] == 2, "the name went out as the number"
+    assert values(enum_app)["mode"] == "SAFE"
+    assert enum_app.mode == "normal"
+
+
+def test_an_enum_can_still_be_written_by_number(enum_app):
+    keys(enum_app, "j", "w", "0", "ENTER")
+    assert enum_app.board.memory[16] == 0
+    assert values(enum_app)["mode"] == "BOOT"
+
+
+def test_a_bad_enum_name_does_not_reach_the_board(enum_app):
+    keys(enum_app, "j", "w", "N", "O", "P", "E", "ENTER")
+    assert enum_app.board.commands == []
+    assert "NOMINAL" in enum_app.message, "the message says what would have worked"
+
+
+def test_a_value_no_enumerator_claims_is_flagged(enum_app):
+    """A slate mode of 7 is a bug, and the ui should not launder it."""
+    enum_app.board.poke(16, Width.WIDTH_U8, 7)
+    enum_app.refresh()
+    assert values(enum_app)["mode"] == "7?"
+
+
+def test_the_hint_lists_the_options_for_the_selected_enum(enum_app):
+    enum_app.refresh()
+    assert hint(enum_app) == "", "sleep_ms is not an enum, so no hint"
+    keys(enum_app, "j")
+    options = ["0", "BOOT", "-", "1", "NOMINAL", "-", "2", "SAFE"]
+    assert hint(enum_app).split() == options
+
+
+def test_the_hint_is_up_while_the_value_is_being_typed(enum_app):
+    keys(enum_app, "j", "w", "S")
+    assert "SAFE" in hint(enum_app)
+    assert enum_app.prompt() == "mode = S"
+
+
+def test_the_hint_marks_the_current_value(enum_app):
+    enum_app.refresh()
+    keys(enum_app, "j")
+    enum_app.theme = Theme(color=True, unicode=False)
+    line = [ln for ln in enum_app.render() if "NOMINAL" in ANSI.sub("", ln)][0]
+    assert GREEN in line  # the value it is sitting on, picked out of the list
+
+
+def test_the_hint_never_overhangs_the_box(enum_app):
+    """A long enum has to give up options rather than ragged edges."""
+    wide = Field(
+        "mode",
+        16,
+        Width.WIDTH_U8,
+        enumerators=tuple((i, f"STATE_NUMBER_{i}") for i in range(12)),
+        type_label="enum Mode",
+    )
+    app = App([wide], Link(LoopbackTransport(FakeBoard(size=20)), timeout=0.05))
+    app.refresh()
+    box_width = visible_len(app.render()[0])
+    assert all(visible_len(line) <= box_width for line in app.render())
+    assert "..." in hint(app), "the list was cut short"
+
+
+def test_enum_names_do_not_ragged_the_box(enum_app):
+    """The value column is sized for the names it may have to show."""
+    enum_app.refresh()
+    keys(enum_app, "j", "w", "S", "A", "F", "E", "ENTER")  # the longest name
+    boxed = [line for line in enum_app.render() if line.startswith(("+", "|"))]
+    assert len({visible_len(line) for line in boxed}) == 1
 
 
 def test_prompt_shows_what_is_being_typed(app):

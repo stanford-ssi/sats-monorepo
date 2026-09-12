@@ -41,7 +41,7 @@ class Row:
     error: bool = False
 
     def update(self, response) -> None:
-        self.value = format_value(response)
+        self.value = format_value(response, self.field)
         self.error = response is None or response.status != Status.STATUS_OK
 
 
@@ -104,7 +104,7 @@ class App:
         # Read it straight back, so a rejected write shows the old value
         # rather than the value that was asked for.
         self.refresh_row(row)
-        self.message = f"{row.field.name} <- {format_value(response)}"
+        self.message = f"{row.field.name} <- {format_value(response, row.field)}"
 
     # -- keys ----------------------------------------------------------
 
@@ -182,6 +182,22 @@ class App:
             return f":{self.buffer}"
         return self.message
 
+    def _value_floor(self) -> int:
+        """Widest the value column ever needs to be.
+
+        Sized from the fields rather than from the values they happen to
+        hold, so the box does not jitter a column wider the first time a
+        long enumerator name comes back from the board.
+        """
+        widest = [VALUE_W]
+        for row in self.rows:
+            field = row.field
+            if field.is_enum:
+                widest += [len(name) for _, name in field.enumerators]
+                # Room for the `7?` an unclaimed value shows as.
+                widest += [len(str(limit)) + 1 for limit in field.limits]
+        return max(widest)
+
     def _widths(self) -> tuple[int, int, int]:
         """Column widths, with any slack given to the value column.
 
@@ -191,9 +207,10 @@ class App:
         """
         name_w = max([5] + [len(r.field.name) for r in self.rows])
         type_w = max([4] + [len(r.field.type_name) for r in self.rows])
-        natural = 3 + name_w + 8 + 2 + type_w + 2 + VALUE_W + 1
+        value_w = self._value_floor()
+        natural = 3 + name_w + 8 + 2 + type_w + 2 + value_w + 1
         slack = max(0, th.visible_len(self._help_text()) - natural)
-        return name_w, type_w, VALUE_W + slack
+        return name_w, type_w, value_w + slack
 
     def _cells(self, marker, name, offset, type_name, value) -> list[str]:
         """One row's cells, padded to their columns.
@@ -277,6 +294,45 @@ class App:
         colour = th.RED if self.row.error else th.DIM
         return "  " + t(self.message, colour)
 
+    def _hint_line(self) -> str:
+        """What the selected enum will accept, since the names are not guessable.
+
+        Only enums get one: every other width says everything it accepts in
+        its type, and a line that is empty most of the time is a line the
+        table could have used instead.
+        """
+        field = self.row.field
+        if not field.is_enum:
+            return ""
+
+        t = self.theme
+        sep = t(f" {t.sep} ", th.DIM)
+        options = [f"{value} {name}" for value, name in field.enumerators]
+
+        # How many options fit, counting the ellipsis that stands in for
+        # the ones that do not. A ragged line past the edge of the box
+        # looks broken, and this is a hint, not something to scroll.
+        room = self._inner_width()  # a box line is the indent plus a border
+        widths = th.visible_len(sep), len(t.ellipsis)
+
+        def length(count: int) -> int:
+            items = options[:count] + ([t.ellipsis] if count < len(options) else [])
+            return sum(map(len, items)) + widths[0] * max(0, len(items) - 1)
+
+        fits = len(options)
+        while fits and length(fits) > room:
+            fits -= 1
+
+        shown = []
+        for value, name in field.enumerators[:fits]:
+            # The value it is currently sitting on is worth picking out of
+            # the list, so the table and the hint read as the same thing.
+            style = (th.GREEN, th.BOLD) if name == self.row.value else (th.DIM,)
+            shown.append(t(str(value), th.DIM) + " " + t(name, *style))
+        if fits < len(options):
+            shown.append(t(t.ellipsis, th.DIM))
+        return "  " + sep.join(shown)
+
     def _help_text(self) -> str:
         t = self.theme
         parts = [t(key, th.CYAN) + " " + t(label, th.DIM) for key, label in HELP]
@@ -290,6 +346,8 @@ class App:
         lines = [self._title_bar(), self._header_line()]
         lines += [self._row_line(i, row) for i, row in enumerate(self.rows)]
         lines.append(self._bottom_bar())
+        if hint := self._hint_line():
+            lines.append(hint)
         lines += [self._prompt_line(), self._help_line()]
         return lines
 

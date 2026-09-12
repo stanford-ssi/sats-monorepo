@@ -199,6 +199,119 @@ def test_bool_input(text, expected):
     assert parse_value(text, BOOL_FIELD) is expected
 
 
+# An enum is carried as its underlying integer; only the ground knows the
+# names, and it gets them from the elf rather than from the command set.
+MODE = Field(
+    "mode",
+    24,
+    Width.WIDTH_U8,
+    enumerators=((0, "BOOT"), (1, "NOMINAL"), (2, "SAFE")),
+    type_label="enum Mode",
+)
+TRIM = Field(
+    "trim",
+    8,
+    Width.WIDTH_I8,
+    enumerators=((-1, "LEFT"), (0, "CENTER"), (1, "RIGHT")),
+    type_label="enum Trim",
+)
+
+
+def test_an_enum_keeps_its_own_type_name():
+    """`uint8` is true but useless; the point is that this one is a Mode."""
+    assert MODE.type_name == "enum Mode"
+    assert MODE.size == 1
+    assert U8.type_name == "uint8"  # unchanged for everything else
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("SAFE", 2),
+        ("safe", 2),  # case is not the user's problem, as with bools
+        (" NOMINAL ", 1),
+        ("BOOT", 0),
+        ("2", 2),  # the number works too
+        ("0x1", 1),
+    ],
+)
+def test_enum_input_by_name_or_by_number(text, expected):
+    assert parse_value(text, MODE) == expected
+
+
+def test_enum_writes_go_out_at_the_underlying_width():
+    """Nothing new on the wire: a Mode is the uint8 it has always been."""
+    cmd = SatCmd.FromString(
+        write_cmd(MODE, parse_value("SAFE", MODE)).SerializeToString()
+    )
+    assert cmd.WhichOneof("cmd") == "write_u8"
+    assert (cmd.write_u8.offset, cmd.write_u8.value) == (24, 2)
+
+
+def test_a_signed_enum_writes_as_signed():
+    cmd = write_cmd(TRIM, parse_value("LEFT", TRIM))
+    assert cmd.WhichOneof("cmd") == "write_i8"
+    assert cmd.write_i8.value == -1
+
+
+@pytest.mark.parametrize("text", ["SAFEISH", "7", "300", "", "-1"])
+def test_input_no_enumerator_claims_is_refused(text):
+    """A slate enum is only meant to hold these, so a typo stops here.
+
+    Same reasoning as `2` not being on the list of bools: the ground is a
+    better place to catch it than the spacecraft.
+    """
+    with pytest.raises(ValueError):
+        parse_value(text, MODE)
+
+
+def test_the_refusal_lists_what_would_have_worked():
+    with pytest.raises(ValueError) as err:
+        parse_value("SAFEISH", MODE)
+    assert str(err.value) == "'SAFEISH' is not a Mode (try 0 BOOT, 1 NOMINAL, 2 SAFE)"
+
+
+def test_long_enums_do_not_spell_out_every_option():
+    wide = Field(
+        "big", 0, Width.WIDTH_U8, enumerators=tuple((i, f"S{i}") for i in range(10))
+    )
+    with pytest.raises(ValueError) as err:
+        parse_value("nope", wide)
+    assert str(err.value).endswith("(try 0 S0, 1 S1, 2 S2, 3 S3, 4 S4, 5 S5, ...)")
+
+
+def test_enum_replies_read_as_names():
+    ok = SatResponse(status=Status.STATUS_OK, width=Width.WIDTH_U8, uint_value=2)
+    assert format_value(ok, MODE) == "SAFE"
+    assert format_value(ok) == "2", "without the field there is only the number"
+
+
+def test_an_unclaimed_enum_value_shows_as_a_number():
+    """A slate enum holding 7 is a bug, and hiding it would not help."""
+    ok = SatResponse(status=Status.STATUS_OK, width=Width.WIDTH_U8, uint_value=7)
+    assert format_value(ok, MODE) == "7?"
+
+
+def test_an_enum_reply_still_surfaces_a_refusal():
+    bad = SatResponse(status=Status.STATUS_BAD_OFFSET, offset=24)
+    assert format_value(bad, MODE) == "BAD_OFFSET"
+    assert format_value(None, MODE) == "no reply"
+
+
+def test_a_negative_enumerator_formats_and_parses():
+    reply = SatResponse(status=Status.STATUS_OK, width=Width.WIDTH_I8, int_value=-1)
+    assert format_value(reply, TRIM) == "LEFT"
+    assert parse_value("-1", TRIM) == -1
+
+
+def test_an_enum_with_no_encoding_is_signed_if_it_has_to_be():
+    """A layout with no DW_AT_encoding still says which values the enum holds."""
+    unsigned = {"size": 1, "type": "enum Mode", "enumerators": ((0, "A"), (1, "B"))}
+    signed = {"size": 1, "type": "enum Trim", "enumerators": ((-1, "L"), (0, "C"))}
+    assert width_of(unsigned) == Width.WIDTH_U8
+    assert width_of(signed) == Width.WIDTH_I8
+
+
 @pytest.mark.parametrize("text", ["2", "-1", "maybe", "", "truthy"])
 def test_bad_bool_input_is_refused(text):
     """`2` is refused on purpose: a slate bool that is neither true nor

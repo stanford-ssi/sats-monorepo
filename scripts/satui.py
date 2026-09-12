@@ -118,13 +118,16 @@ def run_headless(link: Link, fields: list, sets: list) -> None:
         print(f"{field.name:<24} {cobs.frame(cmd.SerializeToString()).hex(' ')}")
         response = link.request(cmd)
         if response is not None:
-            print(f"{'':<24} -> {format_value(response)}")
+            print(f"{'':<24} -> {format_value(response, field)}")
 
 
 def print_layout(struct_name: str, fields: list) -> None:
     print(f"struct {struct_name}:")
     for f in fields:
-        print(f"  {f.name:<24} offset {f.offset:>3}  {f.type_name}")
+        # An enum's constants come out of the debug info too, and they are
+        # what a caller has to know to write the field with --set.
+        options = f"  {{{f.enum_options()}}}" if f.is_enum else ""
+        print(f"  {f.name:<24} offset {f.offset:>3}  {f.type_name}{options}")
 
 
 def main() -> None:
