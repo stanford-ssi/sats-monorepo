@@ -160,6 +160,13 @@ def strip_qualifiers(die: DIE):
     return die
 
 
+def base_encoding(die: DIE):
+    """DW_AT_encoding of a type once typedefs and qualifiers are peeled."""
+    if die is None or "DW_AT_encoding" not in die.attributes:
+        return None
+    return die.attributes["DW_AT_encoding"].value
+
+
 def struct_members(
     die: DIE, flatten: bool = False, prefix: str = "", base: int = 0
 ) -> list:
@@ -197,6 +204,10 @@ def struct_members(
                 "offset": offset,
                 "size": die_byte_size(ftype_die),
                 "type": type_name(ftype_die),
+                # DW_AT_encoding says whether this is signed, unsigned,
+                # float or boolean. That is the authoritative answer; a
+                # type name is only one spelling of it.
+                "encoding": base_encoding(inner),
             }
         )
 
@@ -227,7 +238,12 @@ def get_struct_layout(elf_path: str, struct_name: str, flatten: bool = True) -> 
         result = dump_struct(matches[0], flatten)  # first match
 
     return {
-        f["name"]: {"offset": f["offset"], "size": f["size"], "type": f["type"]}
+        f["name"]: {
+            "offset": f["offset"],
+            "size": f["size"],
+            "type": f["type"],
+            "encoding": f["encoding"],
+        }
         for f in result["fields"]
     }
 

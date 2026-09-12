@@ -4,6 +4,11 @@ import pytest
 
 import cobs
 from protocol import (
+    DW_ATE_BOOLEAN,
+    DW_ATE_FLOAT,
+    DW_ATE_SIGNED,
+    DW_ATE_SIGNED_CHAR,
+    DW_ATE_UNSIGNED,
     Field,
     Unsupported,
     format_value,
@@ -91,7 +96,10 @@ def test_parse_float():
         ({"size": 2, "type": "uint16_t"}, Width.WIDTH_U16),
         ({"size": 4, "type": "uint32_t"}, Width.WIDTH_U32),
         ({"size": 4, "type": "float"}, Width.WIDTH_F32),
-        ({"size": 1, "type": "bool"}, Width.WIDTH_U8),
+        # A bool is a byte, but it is not a uint8: the debug info's type
+        # name is what tells them apart.
+        ({"size": 1, "type": "bool"}, Width.WIDTH_BOOL),
+        ({"size": 1, "type": "_Bool"}, Width.WIDTH_BOOL),
     ],
 )
 def test_width_of_member(member, width):
@@ -165,3 +173,139 @@ def test_good_input_still_parses():
     assert parse_value("4294967295", u32) == 4294967295
     assert parse_value("36.5", Field("t", 0, Width.WIDTH_F32)) == 36.5
     assert parse_value("255", Field("m", 0, Width.WIDTH_U8)) == 255
+
+
+BOOL_FIELD = Field("enabled", 4, Width.WIDTH_BOOL)
+
+BOOL_INPUT = [
+    ("true", True),
+    ("false", False),
+    ("True", True),
+    ("FALSE", False),  # case is not the user's problem
+    ("1", True),
+    ("0", False),
+    ("on", True),
+    ("off", False),
+    ("yes", True),
+    ("no", False),
+    ("t", True),
+    ("f", False),
+    (" true ", True),  # stray whitespace
+]
+
+
+@pytest.mark.parametrize("text,expected", BOOL_INPUT)
+def test_bool_input(text, expected):
+    assert parse_value(text, BOOL_FIELD) is expected
+
+
+@pytest.mark.parametrize("text", ["2", "-1", "maybe", "", "truthy"])
+def test_bad_bool_input_is_refused(text):
+    """`2` is refused on purpose: a slate bool that is neither true nor
+    false is a bug worth seeing, not something to coerce."""
+    with pytest.raises(ValueError):
+        parse_value(text, BOOL_FIELD)
+
+
+def test_a_bool_field_is_one_byte_and_named_bool():
+    assert BOOL_FIELD.size == 1
+    assert BOOL_FIELD.type_name == "bool"
+    assert BOOL_FIELD.is_bool and not BOOL_FIELD.is_float
+
+
+def test_bool_write_uses_the_bool_variant():
+    cmd = write_cmd(BOOL_FIELD, True)
+    assert cmd.WhichOneof("cmd") == "write_bool"
+    assert cmd.write_bool.offset == 4
+    assert cmd.write_bool.value is True
+
+
+def test_a_false_bool_write_is_still_a_non_empty_frame():
+    """An all-default message encodes to zero bytes and the firmware drops
+    the resulting empty frame, so `enabled = false` at offset 0 has to
+    survive the oneof wrapper."""
+    cmd = write_cmd(Field("enabled", 0, Width.WIDTH_BOOL), False)
+    assert len(cmd.SerializeToString()) > 0
+
+
+def test_bool_formats_as_a_word_not_a_number():
+    for value, expected in ((True, "true"), (False, "false")):
+        rsp = SatResponse(
+            status=Status.STATUS_OK,
+            offset=4,
+            width=Width.WIDTH_BOOL,
+            bool_value=value,
+        )
+        assert format_value(rsp) == expected
+
+
+I8 = Field("trim", 0, Width.WIDTH_I8)
+I16 = Field("offset_hz", 0, Width.WIDTH_I16)
+I32 = Field("drift", 0, Width.WIDTH_I32)
+
+
+def test_signed_fields_report_signed_limits():
+    assert I8.limits == (-128, 127)
+    assert I16.limits == (-32768, 32767)
+    assert I32.limits == (-2147483648, 2147483647)
+    assert U32.limits == (0, 4294967295)
+    assert I32.is_signed and not U32.is_signed
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [("-1", -1), ("0", 0), ("127", 127), ("-128", -128), ("-0x10", -16)],
+)
+def test_signed_input(text, expected):
+    assert parse_value(text, I8) == expected
+
+
+@pytest.mark.parametrize("text", ["128", "-129", "1000"])
+def test_signed_input_out_of_range_is_refused(text):
+    with pytest.raises(ValueError, match="does not fit"):
+        parse_value(text, I8)
+
+
+def test_negative_input_is_still_refused_for_unsigned():
+    with pytest.raises(ValueError, match="does not fit"):
+        parse_value("-1", U32)
+
+
+def test_signed_writes_use_the_signed_variants():
+    for field, variant in ((I8, "write_i8"), (I16, "write_i16"), (I32, "write_i32")):
+        cmd = write_cmd(field, -5)
+        assert cmd.WhichOneof("cmd") == variant
+        assert getattr(cmd, variant).value == -5
+
+
+def test_a_negative_value_costs_few_bytes_on_the_wire():
+    """sint32 zigzags, so -1 is cheap. A plain int32 would sign extend it
+    into ten bytes of varint, which matters on a radio link."""
+    assert len(write_cmd(I32, -1).SerializeToString()) <= 6
+
+
+SIGNED_ENCODINGS = [
+    ({"size": 1, "type": "int8_t", "encoding": DW_ATE_SIGNED_CHAR}, Width.WIDTH_I8),
+    ({"size": 2, "type": "int16_t", "encoding": DW_ATE_SIGNED}, Width.WIDTH_I16),
+    ({"size": 4, "type": "int32_t", "encoding": DW_ATE_SIGNED}, Width.WIDTH_I32),
+    ({"size": 4, "type": "unsigned int", "encoding": DW_ATE_UNSIGNED}, Width.WIDTH_U32),
+    ({"size": 1, "type": "bool", "encoding": DW_ATE_BOOLEAN}, Width.WIDTH_BOOL),
+    ({"size": 4, "type": "float", "encoding": DW_ATE_FLOAT}, Width.WIDTH_F32),
+]
+
+
+@pytest.mark.parametrize("member,width", SIGNED_ENCODINGS)
+def test_encoding_decides_the_width(member, width):
+    """Size cannot tell a uint8 from an int8 from a bool, so the encoding
+    is what the choice actually rests on."""
+    assert width_of(member) == width
+
+
+def test_encoding_beats_a_misleading_type_name():
+    member = {"size": 4, "type": "uint32_t", "encoding": DW_ATE_SIGNED}
+    assert width_of(member) == Width.WIDTH_I32
+
+
+def test_a_layout_without_an_encoding_falls_back_to_the_name():
+    assert width_of({"size": 4, "type": "int32_t"}) == Width.WIDTH_I32
+    assert width_of({"size": 1, "type": "bool"}) == Width.WIDTH_BOOL

@@ -21,6 +21,10 @@ struct TestSlate
     uint16_t counter{};
     uint32_t sleep_ms{};
     float temperature{};
+    bool enabled{};
+    int8_t trim{};
+    int16_t offset_hz{};
+    int32_t drift{};
 };
 
 constexpr uint32_t kFlag = 0;
@@ -28,13 +32,21 @@ constexpr uint32_t kMode = 1;
 constexpr uint32_t kCounter = 2;
 constexpr uint32_t kSleepMs = 4;
 constexpr uint32_t kTemperature = 8;
+constexpr uint32_t kEnabled = 12;
+constexpr uint32_t kTrim = 13;
+constexpr uint32_t kOffsetHz = 14;
+constexpr uint32_t kDrift = 16;
 
 static_assert(offsetof(TestSlate, flag) == kFlag, "");
 static_assert(offsetof(TestSlate, mode) == kMode, "");
 static_assert(offsetof(TestSlate, counter) == kCounter, "");
 static_assert(offsetof(TestSlate, sleep_ms) == kSleepMs, "");
 static_assert(offsetof(TestSlate, temperature) == kTemperature, "");
-static_assert(sizeof(TestSlate) == 12, "");
+static_assert(offsetof(TestSlate, enabled) == kEnabled, "");
+static_assert(offsetof(TestSlate, trim) == kTrim, "");
+static_assert(offsetof(TestSlate, offset_hz) == kOffsetHz, "");
+static_assert(offsetof(TestSlate, drift) == kDrift, "");
+static_assert(sizeof(TestSlate) == 20, "");
 
 SatCmd write_u8(uint32_t offset, uint32_t value)
 {
@@ -69,6 +81,38 @@ SatCmd write_f32(uint32_t offset, float value)
     cmd.which_cmd = SatCmd_write_f32_tag;
     cmd.cmd.write_f32.offset = offset;
     cmd.cmd.write_f32.value = value;
+    return cmd;
+}
+
+SatCmd write_signed(uint32_t offset, Width width, int32_t value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    switch (width) {
+    case Width_WIDTH_I8:
+        cmd.which_cmd = SatCmd_write_i8_tag;
+        cmd.cmd.write_i8.offset = offset;
+        cmd.cmd.write_i8.value = value;
+        break;
+    case Width_WIDTH_I16:
+        cmd.which_cmd = SatCmd_write_i16_tag;
+        cmd.cmd.write_i16.offset = offset;
+        cmd.cmd.write_i16.value = value;
+        break;
+    default:
+        cmd.which_cmd = SatCmd_write_i32_tag;
+        cmd.cmd.write_i32.offset = offset;
+        cmd.cmd.write_i32.value = value;
+        break;
+    }
+    return cmd;
+}
+
+SatCmd write_bool(uint32_t offset, bool value)
+{
+    SatCmd cmd = SatCmd_init_zero;
+    cmd.which_cmd = SatCmd_write_bool_tag;
+    cmd.cmd.write_bool.offset = offset;
+    cmd.cmd.write_bool.value = value;
     return cmd;
 }
 
@@ -235,11 +279,15 @@ TEST_F(SlateWriterTest, OffsetPastTheEndIsRejected)
 
 TEST_F(SlateWriterTest, LastFieldIsStillAddressable)
 {
-    /* The bound must not be off by one: the final u32 starts at size - 4. */
+    /* The bound must not be off by one: the last u32 sized slot starts at
+       size - 4 and is inside the slate. Which field lives there depends on
+       the layout, so check the write lands rather than naming one. */
     SatResponse rsp =
         writer_.apply(write_u32(sizeof(TestSlate) - 4, 0xa5a5a5a5));
 
     EXPECT_EQ(rsp.status, Status_STATUS_OK);
+    EXPECT_EQ(writer_.apply(write_u32(kTemperature, 0xa5a5a5a5)).status,
+              Status_STATUS_OK);
     EXPECT_EQ(bits_of(slate_.temperature), 0xa5a5a5a5u);
 }
 
@@ -296,6 +344,155 @@ TEST(SlateWriterTinySlateTest, WidthLargerThanTheSlateIsRejected)
     EXPECT_EQ(writer.apply(read_field(0, Width_WIDTH_F32)).status,
               Status_STATUS_BAD_OFFSET);
     EXPECT_EQ(slate.only, 0);
+}
+
+TEST_F(SlateWriterTest, WritesABool)
+{
+    SatResponse rsp = writer_.apply(write_bool(kEnabled, true));
+
+    EXPECT_EQ(rsp.status, Status_STATUS_OK);
+    EXPECT_EQ(rsp.offset, kEnabled);
+    EXPECT_EQ(rsp.width, Width_WIDTH_BOOL);
+    EXPECT_EQ(rsp.which_value, SatResponse_bool_value_tag);
+    EXPECT_TRUE(rsp.value.bool_value);
+    EXPECT_TRUE(slate_.enabled);
+}
+
+TEST_F(SlateWriterTest, ClearsABool)
+{
+    slate_.enabled = true;
+
+    SatResponse rsp = writer_.apply(write_bool(kEnabled, false));
+
+    EXPECT_EQ(rsp.status, Status_STATUS_OK);
+    EXPECT_EQ(rsp.which_value, SatResponse_bool_value_tag);
+    EXPECT_FALSE(rsp.value.bool_value);
+    EXPECT_FALSE(slate_.enabled);
+}
+
+TEST_F(SlateWriterTest, ABoolIsStoredAsExactlyOneByte)
+{
+    /* The neighbouring bytes are padding here, but the same offset in a
+       real slate could be a field, so a bool write must not spill. */
+    writer_.apply(write_u8(kEnabled + 1, 0xAB));
+    writer_.apply(write_bool(kEnabled, true));
+
+    EXPECT_EQ(reinterpret_cast<uint8_t *>(&slate_)[kEnabled], 1);
+    EXPECT_EQ(reinterpret_cast<uint8_t *>(&slate_)[kEnabled + 1], 0xAB);
+}
+
+TEST_F(SlateWriterTest, AWrittenBoolIsNormalisedToZeroOrOne)
+{
+    /* A bool whose byte is neither 0 nor 1 is not a valid bool, so the
+       write stores 1 rather than whatever the ground happened to send. */
+    writer_.apply(write_bool(kEnabled, true));
+
+    EXPECT_EQ(reinterpret_cast<uint8_t *>(&slate_)[kEnabled], 1);
+}
+
+TEST_F(SlateWriterTest, ReadsAnyNonZeroByteAsTrue)
+{
+    /* Another field's write could leave 0x02 at a bool's offset. Reading
+       that as a bool must not be undefined, and must say true. */
+    writer_.apply(write_u8(kEnabled, 0x02));
+
+    SatResponse rsp = writer_.apply(read_field(kEnabled, Width_WIDTH_BOOL));
+
+    EXPECT_EQ(rsp.status, Status_STATUS_OK);
+    EXPECT_EQ(rsp.which_value, SatResponse_bool_value_tag);
+    EXPECT_TRUE(rsp.value.bool_value);
+}
+
+TEST_F(SlateWriterTest, RefusesABoolPastTheEnd)
+{
+    SatResponse rsp = writer_.apply(write_bool(sizeof(TestSlate), true));
+
+    EXPECT_EQ(rsp.status, Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(rsp.width, Width_WIDTH_BOOL);
+}
+
+TEST_F(SlateWriterTest, ABoolNeedsNoAlignment)
+{
+    /* One byte wide, so every offset inside the slate is fair game. */
+    for (uint32_t offset = 0; offset < sizeof(TestSlate); offset++) {
+        EXPECT_EQ(writer_.apply(write_bool(offset, true)).status,
+                  Status_STATUS_OK)
+            << "offset " << offset;
+    }
+}
+
+TEST_F(SlateWriterTest, WritesANegativeI32)
+{
+    SatResponse rsp = writer_.apply(write_signed(kDrift, Width_WIDTH_I32, -5));
+
+    EXPECT_EQ(rsp.status, Status_STATUS_OK);
+    EXPECT_EQ(rsp.width, Width_WIDTH_I32);
+    EXPECT_EQ(rsp.which_value, SatResponse_int_value_tag);
+    EXPECT_EQ(rsp.value.int_value, -5);
+    EXPECT_EQ(slate_.drift, -5);
+}
+
+TEST_F(SlateWriterTest, WritesNegativeI8AndI16)
+{
+    EXPECT_EQ(writer_.apply(write_signed(kTrim, Width_WIDTH_I8, -1)).status,
+              Status_STATUS_OK);
+    EXPECT_EQ(slate_.trim, -1);
+
+    EXPECT_EQ(
+        writer_.apply(write_signed(kOffsetHz, Width_WIDTH_I16, -300)).status,
+        Status_STATUS_OK);
+    EXPECT_EQ(slate_.offset_hz, -300);
+}
+
+TEST_F(SlateWriterTest, SignedExtremesSurvive)
+{
+    writer_.apply(write_signed(kTrim, Width_WIDTH_I8, -128));
+    EXPECT_EQ(slate_.trim, -128);
+    writer_.apply(write_signed(kTrim, Width_WIDTH_I8, 127));
+    EXPECT_EQ(slate_.trim, 127);
+
+    writer_.apply(write_signed(kDrift, Width_WIDTH_I32, INT32_MIN));
+    EXPECT_EQ(slate_.drift, INT32_MIN);
+    writer_.apply(write_signed(kDrift, Width_WIDTH_I32, INT32_MAX));
+    EXPECT_EQ(slate_.drift, INT32_MAX);
+}
+
+TEST_F(SlateWriterTest, ASignedWriteNarrowsModularly)
+{
+    /* 200 does not fit in an int8; c++20 says the cast wraps, so it lands
+       as -56 and the reply says so rather than claiming 200. */
+    SatResponse rsp = writer_.apply(write_signed(kTrim, Width_WIDTH_I8, 200));
+
+    EXPECT_EQ(rsp.value.int_value, -56);
+    EXPECT_EQ(slate_.trim, -56);
+}
+
+TEST_F(SlateWriterTest, SignedAndUnsignedSeeTheSameBytes)
+{
+    /* The flight side knows offsets, not field types: the same four bytes
+       read back either way, which is what lets the ground decide. */
+    writer_.apply(write_signed(kDrift, Width_WIDTH_I32, -1));
+
+    SatResponse as_uint = writer_.apply(read_field(kDrift, Width_WIDTH_U32));
+    EXPECT_EQ(as_uint.which_value, SatResponse_uint_value_tag);
+    EXPECT_EQ(as_uint.value.uint_value, 0xFFFFFFFFu);
+
+    SatResponse as_int = writer_.apply(read_field(kDrift, Width_WIDTH_I32));
+    EXPECT_EQ(as_int.which_value, SatResponse_int_value_tag);
+    EXPECT_EQ(as_int.value.int_value, -1);
+}
+
+TEST_F(SlateWriterTest, SignedWritesAreStillBoundsAndAlignmentChecked)
+{
+    EXPECT_EQ(writer_.apply(write_signed(sizeof(TestSlate), Width_WIDTH_I32, 1))
+                  .status,
+              Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(
+        writer_.apply(write_signed(kDrift + 1, Width_WIDTH_I32, 1)).status,
+        Status_STATUS_BAD_OFFSET);
+    EXPECT_EQ(
+        writer_.apply(write_signed(0xFFFFFFFF, Width_WIDTH_I32, 1)).status,
+        Status_STATUS_BAD_OFFSET);
 }
 
 } // namespace

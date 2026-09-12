@@ -53,8 +53,12 @@ int main()
            so a new rate from the ground takes effect immediately. */
         if (blink.ready(to_ms_since_boot(get_absolute_time()),
                         gSlate.sleep_ms)) {
-            led_on = !led_on;
+            /* The gate keeps ticking while the led is disabled, so the
+               blink resumes in phase rather than wherever it stopped. */
+            led_on = gSlate.led_enabled && !led_on;
             gpio_put(LED_PIN, led_on);
+            if (led_on)
+                gSlate.cycle_counter++;
         }
 
     } // while(true)

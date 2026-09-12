@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 from parse_slate import get_struct_layout
-from protocol import fields_from_layout
+from protocol import DW_ATE_FLOAT, fields_from_layout
 
 SOURCE = """
 #include <stdint.h>
@@ -61,14 +61,24 @@ def test_flattened_offsets_are_absolute(elf):
 
 def test_types_and_sizes_survive_flattening(elf):
     layout = get_struct_layout(elf, "Slate")
-    assert layout["board_power.voltage"] == {"offset": 8, "size": 4, "type": "float"}
+    assert layout["board_power.voltage"] == {
+        "offset": 8,
+        "size": 4,
+        "type": "float",
+        "encoding": DW_ATE_FLOAT,
+    }
     assert layout["mode"]["size"] == 1
 
 
 def test_unflattened_layout_still_available(elf):
     """The old view is what a caller that can only address words wants."""
     layout = get_struct_layout(elf, "Slate", flatten=False)
-    assert layout["board_power"] == {"offset": 8, "size": 8, "type": "struct PowerInfo"}
+    assert layout["board_power"] == {
+        "offset": 8,
+        "size": 8,
+        "type": "struct PowerInfo",
+        "encoding": None,  # an aggregate has no base type encoding
+    }
 
 
 def test_every_flattened_member_is_addressable(elf):

@@ -5,7 +5,7 @@ import pytest
 import cobs
 from fake_board import FakeBoard
 from link import Link, LoopbackTransport, NullTransport
-from protocol import Field, read_cmd, response_value, write_cmd
+from protocol import Field, format_value, read_cmd, response_value, write_cmd
 from sats_proto import SatCmd, SatResponse, Status, Width
 
 SLEEP_MS = Field("sleep_ms", 0, Width.WIDTH_U32)
@@ -121,3 +121,70 @@ def test_silence_is_reported_rather_than_swallowed():
     """Nothing on the far end has to look different from a zero reading."""
     link = Link(NullTransport(), timeout=0)
     assert link.request(read_cmd(SLEEP_MS)) is None
+
+
+def test_bool_round_trip():
+    board = FakeBoard(size=8)
+    field = Field("enabled", 4, Width.WIDTH_BOOL)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+
+    assert format_value(link.request(read_cmd(field))) == "false"
+    link.request(write_cmd(field, True))
+    assert format_value(link.request(read_cmd(field))) == "true"
+    link.request(write_cmd(field, False))
+    assert format_value(link.request(read_cmd(field))) == "false"
+
+
+def test_a_bool_write_touches_exactly_one_byte():
+    board = FakeBoard(size=8)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+    board.poke(5, Width.WIDTH_U8, 0xAB)
+
+    link.request(write_cmd(Field("enabled", 4, Width.WIDTH_BOOL), True))
+
+    assert board.peek(4, Width.WIDTH_U8) == 1
+    assert board.peek(5, Width.WIDTH_U8) == 0xAB  # neighbour untouched
+
+
+def test_a_non_zero_byte_reads_back_as_true():
+    """Matches load<uint8_t>(offset) != 0 in SlateWriter: a byte left at 2
+    by some other write is still true, not undefined."""
+    board = FakeBoard(size=8)
+    board.poke(4, Width.WIDTH_U8, 2)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+
+    rsp = link.request(read_cmd(Field("enabled", 4, Width.WIDTH_BOOL)))
+    assert rsp.bool_value is True
+
+
+def test_signed_round_trip_through_the_fake_board():
+    board = FakeBoard(size=8)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+    field = Field("drift", 4, Width.WIDTH_I32)
+
+    link.request(write_cmd(field, -12345))
+    rsp = link.request(read_cmd(field))
+    assert rsp.int_value == -12345
+    assert format_value(rsp) == "-12345"
+
+
+def test_the_fake_board_narrows_signed_the_way_cpp_does():
+    """200 into an int8 wraps to -56, matching a c++20 static_cast."""
+    board = FakeBoard(size=8)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+
+    rsp = link.request(write_cmd(Field("trim", 4, Width.WIDTH_I8), 127))
+    assert rsp.int_value == 127
+    board.poke(4, Width.WIDTH_I8, -56)
+    assert board.peek(4, Width.WIDTH_I8) == -56
+
+
+def test_the_same_bytes_read_signed_or_unsigned():
+    board = FakeBoard(size=8)
+    link = Link(LoopbackTransport(board), timeout=0.05)
+    link.request(write_cmd(Field("drift", 4, Width.WIDTH_I32), -1))
+
+    as_uint = link.request(read_cmd(Field("raw", 4, Width.WIDTH_U32)))
+    as_int = link.request(read_cmd(Field("drift", 4, Width.WIDTH_I32)))
+    assert as_uint.uint_value == 0xFFFFFFFF
+    assert as_int.int_value == -1
