@@ -9,6 +9,6 @@ fn panic(_info: &PanicInfo) -> ! {
 }
 
 #[no_mangle]
-pub extern "C" fn add(a: i32, b: i32) -> i32 {
+pub extern "C" fn rust_add(a: i32, b: i32) -> i32 {
     a + b
 }

@@ -29,6 +29,8 @@ cc_library(
         "//common/cmd_receiver",
         "//common/cmd_responder",
         "//common/slate",
+        "//common/rust_example",
+        "//common/fs",
     ]
 )
 
