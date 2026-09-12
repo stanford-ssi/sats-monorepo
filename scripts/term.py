@@ -24,7 +24,6 @@ from theme import ANSI, visible_len
 HIDE_CURSOR = "\x1b[?25l"
 SHOW_CURSOR = "\x1b[?25h"
 CLEAR_LINE = "\x1b[2K"
-CLEAR_BELOW = "\x1b[J"
 
 # How long to wait for the rest of an escape sequence before deciding the
 # user just pressed Esc. Long enough for a keystroke to arrive whole, short
@@ -84,6 +83,34 @@ def decode(seq: str) -> str | None:
     return CONTROL.get(seq, seq)
 
 
+def cursor_up(lines: int) -> str:
+    return f"\x1b[{lines}A" if lines > 0 else ""
+
+
+def resize(old: int, new: int) -> str:
+    """What to write to make the block `new` lines tall instead of `old`.
+
+    The cursor starts and finishes on the block's last line, which is
+    where draw() counts up from.
+
+    Two things this deliberately does not do, because the ui gains and
+    loses a hint line on an ordinary keypress rather than once at startup.
+    It does not erase the block and lay it out again, which shows as a
+    blank frame. And it does not re-pin the block to the bottom of the
+    screen, which would scroll everything above the ui up a line every
+    time the cursor touched an enum field; the lines a shrinking block
+    gives back are simply blanked where they stand, so growing back into
+    them later costs no scroll at all.
+    """
+    if new == old:
+        return ""
+    if new > old:
+        # A one line block is the line the cursor is already on, so the
+        # first line of a new block costs nothing to scroll in.
+        return "\n" * (new - max(old, 1))
+    return (CLEAR_LINE + cursor_up(1)) * (old - new) + "\r"
+
+
 def clip(line: str, width: int) -> str:
     """Keep a line inside the terminal without wrapping.
 
@@ -127,9 +154,7 @@ class Terminal:
 
         # The cursor always rests on the last line of the block, so going
         # back up by height-1 lands on the first.
-        if self._height > 1:
-            self.out.write(f"\x1b[{self._height - 1}A")
-        self.out.write("\r")
+        self.out.write(cursor_up(self._height - 1) + "\r")
 
         for i, line in enumerate(lines):
             self.out.write(CLEAR_LINE + clip(line, width))
@@ -139,12 +164,8 @@ class Terminal:
         self.out.flush()
 
     def _reserve(self, height: int) -> None:
-        """Scroll the terminal up to make room for `height` lines."""
-        if self._height:
-            if self._height > 1:
-                self.out.write(f"\x1b[{self._height - 1}A")
-            self.out.write("\r" + CLEAR_BELOW)
-        self.out.write("\n" * (height - 1))
+        """Make the block `height` lines tall, in place."""
+        self.out.write(resize(self._height, height))
         self._height = height
 
     def _fill(self, timeout: float) -> bool:
