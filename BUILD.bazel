@@ -59,4 +59,3 @@ cc_binary(
     ],
     deps = [":blink_lib"],
 )
-
