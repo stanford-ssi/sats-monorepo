@@ -1,4 +1,4 @@
-from math_utils import R1, R2, R3
+from math_utils import R1
 
 theta = 3.14
 

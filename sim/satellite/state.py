@@ -28,10 +28,16 @@ class SatelliteState:
         self.mjd_epoch = mjd_epoch  # time in modified Julian days [days]
 
     def __repr__(self):
-        return f"SatelliteState(t={self.t}, q={self.q}, w={self.w}, r={self.r}, v={self.v})"
+        return (
+            f"SatelliteState(t={self.t}, q={self.q}, "
+            f"w={self.w}, r={self.r}, v={self.v})"
+        )
 
     def __str__(self):
-        return f"SatelliteState(t={self.t}, q={self.q}, w={self.w}, r={self.r}, v={self.v})"
+        return (
+            f"SatelliteState(t={self.t}, q={self.q}, "
+            f"w={self.w}, r={self.r}, v={self.v})"
+        )
 
     def __add__(self, other):
         return SatelliteState(
