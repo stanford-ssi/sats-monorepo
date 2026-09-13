@@ -118,11 +118,15 @@ uv run pytest        # ground tooling
 ``` bash
 bazel run //:format            # rewrite c++ with clang-format, python with ruff
 bazel run //:format -- --check # verify only, what CI runs
+uv run pre-commit install      # install the formatter as a git commit hook
 ```
 
 Only tracked files are formatted, so `git add` a new file before expecting
 it to be touched. C++ needs clang-format 18 on the path; its output drifts
 between major versions and CI pins that one.
+
+The commit hook formats the staged snapshot. If it changes anything, the
+commit stops so you can review and stage the fixes before committing again.
 
 ## Run the CI checks locally
 
