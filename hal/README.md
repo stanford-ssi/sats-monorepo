@@ -7,4 +7,4 @@ implementations should implement the same api past some hardware-specific
 initialization routine.
 
 [boards/]
-Board hardware definitions should be defined in [boards/]. 
+Board hardware definitions should be defined in [boards/].

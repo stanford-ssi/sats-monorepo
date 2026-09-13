@@ -13,4 +13,3 @@ cc_library(
     include_prefix = "hal",
     target_compatible_with = ["//platforms:arm_cortex_m33"],
 )
-

@@ -118,7 +118,7 @@ uv run pytest        # ground tooling
 ``` bash
 bazel run //:format            # rewrite c++ with clang-format, python with ruff
 bazel run //:format -- --check # verify only, what CI runs
-uv run pre-commit install      # install the formatter as a git commit hook
+uv run pre-commit install      # install the repository's git commit hooks
 ```
 
 Only tracked files are formatted, so `git add` a new file before expecting
