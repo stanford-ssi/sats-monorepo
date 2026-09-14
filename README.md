@@ -106,6 +106,84 @@ Messages are nanopb encoded and cobs framed, one zero byte per frame.
 Writes are bounds and alignment checked against `sizeof(Slate)`, so a bad
 offset comes back as `BAD_OFFSET` rather than corrupting memory.
 
+## The filesystem
+
+Flash is a [littlefs](https://github.com/littlefs-project/littlefs)
+filesystem: power loss resilient, wear levelling, and not ours to maintain.
+It is not in the bazel central registry, so `MODULE.bazel` pulls v2.11.3
+from its release tarball by sha256 and builds it with
+`third_party/littlefs.BUILD`, which compiles the four files that make up the
+filesystem and nothing from `bd/`, `tests/` or `benches/`.
+
+Two of its build options matter here. `LFS_NO_MALLOC` means there is no
+heap: every buffer it needs is handed to it, like the rest of this firmware.
+`LFS_NO_DEBUG`, `LFS_NO_WARN` and `LFS_NO_ERROR` turn off its printf
+logging, because the cdc port is carrying cobs framed commands and anything
+printed onto it is corruption as far as the ground is concerned. Errors come
+back as return codes instead.
+
+What is ours is the wiring on either side of it:
+
+- `common/fs/lfs_storage.hpp` is the block device littlefs asks to be
+  given, filled in for a `BlockDevice`: block and offset addressing into
+  byte offsets, geometry read off the device rather than hardcoded, and the
+  read, program, lookahead and per-file buffers it would otherwise have
+  malloc'd. It is not a layer over littlefs and wraps none of it;
+  `config()` being null for a device it cannot be configured for is the
+  only failure it has.
+- `common/fs/lfs_files.hpp` is two convenience calls, `lfs_read_whole()`
+  and `lfs_write_whole()`, because littlefs has no single call for a whole
+  file and the close is the operation that commits one. An app that checks
+  the write and not the close loses saves silently, so that is collapsed
+  once here rather than in every app.
+- `hal/pico/flash.cpp` is the chip itself, and the only pico specific part.
+  It claims the top 128 KiB, erases and programs with interrupts off, since
+  the flash is not answering the memory bus while that runs and every
+  interrupt handler on this board lives in it, and refuses to hand out a
+  region a grown firmware image has run into rather than one that works
+  until the next build.
+
+Apps use the littlefs api directly otherwise; nothing of ours wraps it, and
+mounting, formatting and the decision about what to do when a mount fails
+stay visible in the app rather than behind a method. littlefs's own
+`DESIGN.md` and `SPEC.md` are the reference for what it guarantees. Note that `lfs_file_open()` is unusable in this build, with no
+heap to take a file cache from: `lfs_file_opencfg()` with an `LfsFileBuffer`
+is the way in, one per file open at a time.
+
+`blink` uses it for one file, `settings`. At startup it mounts, formatting
+first if there is nothing there yet, restores `sleep_ms` and `led_enabled`,
+then counts the boot and writes that back, so `boot_count` in the slate goes
+up by one every power cycle rather than starting from zero. To keep a new
+rate across a reset, set it and then ask for a save:
+
+``` bash
+uv run scripts/satui.py --set sleep_ms=1000 --set save_settings=1
+```
+
+The firmware clears `save_settings` once the write has landed and leaves
+`fs_error` at 0 if it worked; anything else is one of the negative
+`LFS_ERR` codes from `lfs.h`. `fs_bytes_free` is what littlefs has not
+allocated, counted in blocks. Saving is asked for rather than automatic
+because programming flash runs with interrupts off and stops the loop for
+as long as it takes.
+
+Where the region sits depends on how big the build thinks the chip is,
+which is `PICO_FLASH_SIZE_BYTES` from the board header the pico sdk picks
+up. That is 2 MB as this builds today, putting the region at `0x101e0000`,
+so `fs_base` in the slate is the number to read rather than one to
+remember. Note that the `--define=PICO_BOARD=samwise_pico` in `.bazelrc`
+does not reach the sdk under bazel, which wants
+`--@pico-sdk//bazel/config:PICO_BOARD`; until that is sorted out the build
+is using the `pico` board header.
+
+`picotool load` only writes as far as the image reaches, so flashing new
+firmware leaves the filesystem alone. To wipe it and watch the next boot lay
+down a fresh one, using `fs_base` for the start:
+
+``` bash
+picotool erase -r 0x101e0000 0x10200000
+```
+
 ## How to run the tests
 
 ``` bash

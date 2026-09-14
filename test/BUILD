@@ -48,3 +48,15 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "fs_test",
+    size = "small",
+    srcs = ["fs_test.cpp"],
+    deps = [
+        "//common/fs",
+        "//common/fs:ram_block_device",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)

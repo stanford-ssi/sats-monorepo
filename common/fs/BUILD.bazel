@@ -1,0 +1,24 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "fs",
+    hdrs = [
+        "block_device.hpp",
+        "lfs_files.hpp",
+        "lfs_storage.hpp",
+    ],
+    srcs = [
+        "lfs_files.cpp",
+        "lfs_storage.cpp",
+    ],
+    deps = ["@littlefs"],
+)
+
+# A flash chip in memory, so the wiring above can be tested on the host.
+# Not linked into flight software.
+cc_library(
+    name = "ram_block_device",
+    testonly = True,
+    hdrs = ["ram_block_device.hpp"],
+    deps = [":fs"],
+)
