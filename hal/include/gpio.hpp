@@ -7,20 +7,23 @@
 
 #include <memory>
 
-enum class GpioFunction {
+enum class GpioFunction
+{
     Input,
     Output,
 };
 
-class Gpio {
+class Gpio
+{
 public:
     class GpioHardware;
 
     void set(bool value);
 
     void set_function(GpioFunction func);
-private:
-    GpioHardware &hardware_; 
 
-    Gpio(GpioHardware &hardware) : hardware_(hardware) {};
+private:
+    GpioHardware &hardware_;
+
+    Gpio(GpioHardware &hardware) : hardware_(hardware){};
 };
