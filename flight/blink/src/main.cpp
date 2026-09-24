@@ -15,6 +15,8 @@
 #include "common/slate/slate_writer.hpp"
 
 #include "hal/usb_queue.hpp"
+#include "hal/gpio.hpp"
+#include "hal/pico/pico_gpio.hpp"
 #include <optional>
 
 #include "slate.hpp"
@@ -28,8 +30,9 @@ int main()
     sleep_ms(1000);
 
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
+    Gpio::GpioHardware led_hardware = Gpio::GpioHardware(LED_PIN);
+    Gpio led_gpio = led_hardware.build();
+    led_gpio.set_function(GpioFunction::Output);
 
     UsbQueue q{};
     CmdReceiver recv{q};
@@ -56,7 +59,7 @@ int main()
             /* The gate keeps ticking while the led is disabled, so the
                blink resumes in phase rather than wherever it stopped. */
             led_on = gSlate.led_enabled && !led_on;
-            gpio_put(LED_PIN, led_on);
+            led_gpio.set(led_on);
             if (led_on)
                 gSlate.cycle_counter++;
         }
