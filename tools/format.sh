@@ -36,21 +36,28 @@ fi
 
 # Only tracked files: a brand new file has to be git added before it is
 # formatted, which is also what keeps this in step with the CI check.
-mapfile -t sources < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' |
-    grep -v rust_example)
-if [[ ${#sources[@]} -eq 0 ]]; then
+cpp_sources=()
+while IFS= read -r source; do
+    cpp_sources+=("$source")
+done < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v rust_example)
+if [[ ${#cpp_sources[@]} -eq 0 ]]; then
     echo "error: no c++ sources found" >&2
     exit 1
 fi
 
+python_sources=()
+while IFS= read -r source; do
+    python_sources+=("$source")
+done < <(git ls-files '*.py')
+
 if $check; then
-    echo "checking ${#sources[@]} c++ files"
-    "$clang_format" --style=file --dry-run --Werror "${sources[@]}"
-    uv run ruff check .
-    uv run ruff format --check .
+    echo "checking ${#cpp_sources[@]} c++ files"
+    "$clang_format" --style=file --dry-run --Werror "${cpp_sources[@]}"
+    uv run ruff check "${python_sources[@]}"
+    uv run ruff format --check "${python_sources[@]}"
 else
-    echo "formatting ${#sources[@]} c++ files"
-    "$clang_format" -i --style=file "${sources[@]}"
-    uv run ruff check --fix .
-    uv run ruff format .
+    echo "formatting ${#cpp_sources[@]} c++ files"
+    "$clang_format" -i --style=file "${cpp_sources[@]}"
+    uv run ruff check --fix "${python_sources[@]}"
+    uv run ruff format "${python_sources[@]}"
 fi
