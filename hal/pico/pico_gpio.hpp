@@ -1,3 +1,4 @@
+#pragma once
 #include "hal/gpio.hpp"
 #include "pico/stdlib.h"
 
