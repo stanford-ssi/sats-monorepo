@@ -76,6 +76,11 @@ BOOL_WORDS = {
 }
 
 
+# Enumerators to name in an error message before trailing off. The ui has
+# the full list on its hint line; an error only has one line to work with.
+ERROR_OPTIONS = 6
+
+
 class Unsupported(Exception):
     """A slate member the command set has no width for."""
 
@@ -87,6 +92,12 @@ class Field:
     name: str
     offset: int
     width: int  # a Width enum value
+    # (value, name) per enumerator, as declared. Empty for everything that
+    # is not an enum. A tuple rather than a dict so Field stays hashable.
+    enumerators: tuple[tuple[int, str], ...] = ()
+    # How the debug info spells the type, kept only for an enum: `uint8`
+    # says how many bytes go on the wire but not that this is a Mode.
+    type_label: str = ""
 
     @property
     def size(self) -> int:
@@ -94,7 +105,7 @@ class Field:
 
     @property
     def type_name(self) -> str:
-        return WIDTH_NAMES[self.width]
+        return self.type_label or WIDTH_NAMES[self.width]
 
     @property
     def is_float(self) -> bool:
@@ -109,12 +120,45 @@ class Field:
         return self.width in SIGNED
 
     @property
+    def is_enum(self) -> bool:
+        return bool(self.enumerators)
+
+    @property
     def limits(self) -> tuple[int, int]:
         """Inclusive range an integer field accepts."""
         bits = 8 * self.size
         if self.is_signed:
             return -(1 << (bits - 1)), (1 << (bits - 1)) - 1
         return 0, (1 << bits) - 1
+
+    def enum_name(self, value) -> str | None:
+        """The enumerator named `value`, or None if the enum has no such value.
+
+        Two enumerators can share a value, in which case the first one
+        declared wins; that is the same one the compiler would print.
+        """
+        for known, name in self.enumerators:
+            if known == value:
+                return name
+        return None
+
+    def enum_value(self, text: str) -> int | None:
+        """The value of the enumerator called `text`, matched case blind."""
+        for value, name in self.enumerators:
+            if name.lower() == text.lower():
+                return value
+        return None
+
+    @property
+    def enum_label(self) -> str:
+        """The type as it reads in a sentence: `Mode`, not `enum Mode`."""
+        return self.type_name.removeprefix("enum ")
+
+    def enum_options(self, limit: int | None = None) -> str:
+        """The enumerators as `0 BOOT, 1 NOMINAL, ...` for a hint or an error."""
+        shown = self.enumerators if limit is None else self.enumerators[:limit]
+        text = ", ".join(f"{value} {name}" for value, name in shown)
+        return f"{text}, ..." if len(shown) < len(self.enumerators) else text
 
 
 # Spellings to fall back on when a layout carries no encoding, e.g. one
@@ -152,8 +196,13 @@ def width_of(member: dict) -> int:
         return width
 
     # Unsigned is the safe assumption for an unlabelled integer: it is how
-    # the raw bytes read, and nothing is silently sign extended.
+    # the raw bytes read, and nothing is silently sign extended. An enum is
+    # the one case we can do better on without an encoding, because its own
+    # constants give it away: a negative enumerator cannot fit an unsigned
+    # underlying type, so -1 would otherwise read back as 255.
     if encoding is None and size in (1, 2, 4) and "[" not in type_name:
+        if any(value < 0 for value, _ in member.get("enumerators") or ()):
+            return {1: Width.WIDTH_I8, 2: Width.WIDTH_I16, 4: Width.WIDTH_I32}[size]
         return {1: Width.WIDTH_U8, 2: Width.WIDTH_U16, 4: Width.WIDTH_U32}[size]
 
     raise Unsupported(f"no command width for a {size} byte {type_name or '?'}")
@@ -163,8 +212,19 @@ def fields_from_layout(layout: dict) -> tuple[list[Field], dict[str, str]]:
     """Split a parse_slate layout into addressable fields and the leftovers."""
     fields, skipped = [], {}
     for name, member in layout.items():
+        constants = tuple(member.get("enumerators") or ())
         try:
-            fields.append(Field(name, member["offset"], width_of(member)))
+            fields.append(
+                Field(
+                    name,
+                    member["offset"],
+                    width_of(member),
+                    enumerators=constants,
+                    # Only an enum keeps its spelling; for the rest the
+                    # width's own name is the more useful label.
+                    type_label=member.get("type", "") if constants else "",
+                )
+            )
         except Unsupported as err:
             skipped[name] = str(err)
     return fields, skipped
@@ -222,6 +282,9 @@ def parse_value(text: str, field: Field):
         except KeyError:
             raise ValueError(f"{text!r} is not a bool (try true or false)") from None
 
+    if field.is_enum:
+        return parse_enum(text, field)
+
     try:
         if field.is_float:
             return float(text)
@@ -235,14 +298,42 @@ def parse_value(text: str, field: Field):
     return value
 
 
+def parse_enum(text: str, field: Field) -> int:
+    """An enumerator, by name or by number.
+
+    A number that no enumerator claims is refused rather than sent, for the
+    same reason `2` is not on the list of bools: the slate field is only
+    ever meant to hold one of these, so a typo is worth catching on the
+    ground instead of on the spacecraft.
+    """
+    value = field.enum_value(text)
+    if value is not None:
+        return value
+
+    try:
+        value = int(text, 0)
+    except ValueError:
+        value = None
+    if value is None or field.enum_name(value) is None:
+        raise ValueError(
+            f"{text!r} is not a {field.enum_label} "
+            f"(try {field.enum_options(limit=ERROR_OPTIONS)})"
+        )
+    return value
+
+
 def response_value(response):
     """The value carried by a SatResponse, or None if it carries neither."""
     which = response.WhichOneof("value")
     return None if which is None else getattr(response, which)
 
 
-def format_value(response) -> str:
-    """How a reply should read in the table: the value, or why there isn't one."""
+def format_value(response, field: Field | None = None) -> str:
+    """How a reply should read in the table: the value, or why there isn't one.
+
+    `field` is what turns a number back into an enumerator; without one a
+    reply still formats, just as the bare number that came over the wire.
+    """
     if response is None:
         return "no reply"
     if response.status != Status.STATUS_OK:
@@ -251,6 +342,10 @@ def format_value(response) -> str:
     value = response_value(response)
     if value is None:
         return "no value"
+    if field is not None and field.is_enum:
+        # A slate enum holding a value no enumerator claims is a bug, so
+        # show the number, flagged, rather than quietly calling it a name.
+        return field.enum_name(value) or f"{value}?"
     if response.width == Width.WIDTH_BOOL:
         return "true" if value else "false"
     if response.width == Width.WIDTH_F32:

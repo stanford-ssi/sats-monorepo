@@ -67,18 +67,27 @@ is left behind when you quit, like any other command's output:
 ```
 ╭─ Slate ──────────────────────────────────── /dev/ttyACM0 ─╮
 │   field                offset  type                 value │
-│ › sleep_ms                  0  uint32                 250 │
+│   sleep_ms                  0  uint32                 250 │
 │   temperature               4  float                 36.5 │
 │   board_power.voltage       8  float                  3.3 │
 │   board_power.current      12  float                 0.75 │
+│ › mode                     16  enum Mode          NOMINAL │
 ╰───────────────────────────────────────────────────────────╯
-  sleep_ms <- 250
+  0 BOOT · 1 NOMINAL · 2 SAFE
+  mode <- NOMINAL
   w write · r refresh · a auto · j/k move · g/G ends · q quit
 ```
 
 Every value shown is read back from the board rather than remembered
 locally, so a refused write is visibly different from one that landed;
 `BAD_OFFSET` and friends show up in the value column in red.
+
+An enum member is shown by name, and the line under the box lists what the
+selected one will accept; either the name or the number can be typed, and a
+value no enumerator claims reads as `7?` rather than being passed off as a
+name. None of that is in the command protocol: the enumerators come out of
+the same debug info as the offsets, and the field goes over the wire as the
+integer it is.
 
 | key | |
 |---|---|

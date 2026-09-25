@@ -167,6 +167,29 @@ def base_encoding(die: DIE):
     return die.attributes["DW_AT_encoding"].value
 
 
+def enumerators(die: DIE) -> tuple:
+    """(value, name) for each constant of an enumeration type, as declared.
+
+    The debug info spells out an enum's constants, so a caller can show a
+    field as SAFE rather than as 2 without being told anything about the
+    type. Anything that is not an enum has none, which is how the rest of
+    the code tells the two apart.
+    """
+    if die is None or die.tag != "DW_TAG_enumeration_type":
+        return ()
+
+    found = []
+    for child in die.iter_children():
+        if child.tag != "DW_TAG_enumerator":
+            continue
+        name = child.attributes.get("DW_AT_name")
+        value = child.attributes.get("DW_AT_const_value")
+        if name is None or value is None:
+            continue
+        found.append((value.value, name.value.decode()))
+    return tuple(found)
+
+
 def struct_members(
     die: DIE, flatten: bool = False, prefix: str = "", base: int = 0
 ) -> list:
@@ -198,18 +221,21 @@ def struct_members(
                 fields += nested
                 continue
 
-        fields.append(
-            {
-                "name": prefix + name,
-                "offset": offset,
-                "size": die_byte_size(ftype_die),
-                "type": type_name(ftype_die),
-                # DW_AT_encoding says whether this is signed, unsigned,
-                # float or boolean. That is the authoritative answer; a
-                # type name is only one spelling of it.
-                "encoding": base_encoding(inner),
-            }
-        )
+        record = {
+            "name": prefix + name,
+            "offset": offset,
+            "size": die_byte_size(ftype_die),
+            "type": type_name(ftype_die),
+            # DW_AT_encoding says whether this is signed, unsigned,
+            # float or boolean. That is the authoritative answer; a
+            # type name is only one spelling of it.
+            "encoding": base_encoding(inner),
+        }
+        # Only enums carry this, so a plain member's record is unchanged.
+        constants = enumerators(inner)
+        if constants:
+            record["enumerators"] = constants
+        fields.append(record)
 
     return fields
 
@@ -237,15 +263,18 @@ def get_struct_layout(elf_path: str, struct_name: str, flatten: bool = True) -> 
 
         result = dump_struct(matches[0], flatten)  # first match
 
-    return {
-        f["name"]: {
+    layout = {}
+    for f in result["fields"]:
+        member = {
             "offset": f["offset"],
             "size": f["size"],
             "type": f["type"],
             "encoding": f["encoding"],
         }
-        for f in result["fields"]
-    }
+        if "enumerators" in f:
+            member["enumerators"] = f["enumerators"]
+        layout[f["name"]] = member
+    return layout
 
 
 def main():

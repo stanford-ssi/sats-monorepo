@@ -1,8 +1,10 @@
-"""The terminal driver's pure parts: key decoding and line clipping."""
+"""The terminal driver's pure parts: key decoding, resizing, clipping."""
+
+import re
 
 import pytest
 
-from term import clip, decode, next_key
+from term import CLEAR_LINE, clip, decode, next_key, resize
 from theme import Theme, visible_len
 
 CASES = [
@@ -50,6 +52,49 @@ def test_clip_strips_colour_before_truncating():
     out = clip(Theme()("hello world", "1"), 5)
     assert out == "hello"
     assert "\x1b" not in out
+
+
+RESIZES = [
+    (0, 1, ""),  # a one line block is the line the cursor is already on
+    (0, 3, "\n\n"),  # the first frame, scrolling its own room in
+    (3, 4, "\n"),  # a hint line appears under the box
+    (3, 3, ""),
+]
+
+
+@pytest.mark.parametrize("old,new,expected", RESIZES)
+def test_resize_scrolls_in_only_the_lines_it_gains(old, new, expected):
+    assert resize(old, new) == expected
+
+
+def test_resizing_never_erases_the_whole_block():
+    """Erasing it and laying it out again is the flicker this avoids.
+
+    The ui grows a hint line whenever the cursor lands on an enum field
+    and drops it again on the way out, so this happens on an ordinary
+    keypress rather than once at startup.
+    """
+    assert "\x1b[J" not in resize(3, 4) + resize(4, 3)  # erase below
+
+
+def test_shrinking_blanks_the_lines_it_gives_back_where_they_stand():
+    """Every line it drops is cleared, and the cursor ends up on the new
+    last line, which is where the next frame counts up from."""
+    assert resize(4, 3) == CLEAR_LINE + "\x1b[1A" + "\r"
+    assert resize(5, 3).count(CLEAR_LINE) == 2
+    assert re.findall(r"\x1b\[(\d+)([AB])", resize(5, 3)) == [("1", "A"), ("1", "A")]
+
+
+def test_a_line_that_comes_and_goes_leaves_the_block_where_it_was():
+    """Losing the hint line and gaining it back has to be a round trip.
+
+    Anything else scrolls the terminal on every move onto an enum field,
+    and the ui would crawl up the screen away from whatever it started
+    under.
+    """
+    down = resize(3, 4).count("\n")
+    up = resize(4, 3).count("\x1b[1A")
+    assert down == up == 1
 
 
 SPLITS = [

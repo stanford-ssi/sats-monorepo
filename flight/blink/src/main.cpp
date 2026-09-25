@@ -39,6 +39,9 @@ int main()
     Interval blink{};
     bool led_on = false;
 
+    /* Init is done, so we are flying rather than starting up. */
+    gSlate.mode = Mode::NOMINAL;
+
     while (true) {
         recv.update();
 
@@ -54,8 +57,10 @@ int main()
         if (blink.ready(to_ms_since_boot(get_absolute_time()),
                         gSlate.sleep_ms)) {
             /* The gate keeps ticking while the led is disabled, so the
-               blink resumes in phase rather than wherever it stopped. */
-            led_on = gSlate.led_enabled && !led_on;
+               blink resumes in phase rather than wherever it stopped.
+               SAFE parks the led too: the point of the mode is to stop
+               spending power on anything we do not need. */
+            led_on = gSlate.led_enabled && gSlate.mode != Mode::SAFE && !led_on;
             gpio_put(LED_PIN, led_on);
             if (led_on)
                 gSlate.cycle_counter++;

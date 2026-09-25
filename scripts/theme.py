@@ -43,6 +43,7 @@ class Theme:
         self.marker = "›" if unicode else ">"
         self.sep = "·" if unicode else "-"
         self.caret = "▏" if unicode else "_"
+        self.ellipsis = "…" if unicode else "..."
 
     def __call__(self, text: str, *codes: str) -> str:
         if not self.color or not codes:
