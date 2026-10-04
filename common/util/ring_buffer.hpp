@@ -62,7 +62,8 @@ public:
 
     void clear()
     {
-        head_ = tail_ = 0;
+        tail_ = 0;
+        head_ = 0;
     }
 
 private:

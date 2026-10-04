@@ -41,3 +41,13 @@ register_toolchains(
 
 # Google Test Framework
 bazel_dep(name = "googletest", version = "1.17.0")
+
+# Hermetic LLVM/Clang toolchain for host builds. Registered after the pico-sdk
+# toolchains; those only match the RP2350 platform.
+bazel_dep(name = "toolchains_llvm", version = "1.10.0")
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
+llvm.toolchain(llvm_version = "22.1.8")
+use_repo(llvm, "llvm_toolchain")
+
+register_toolchains("@llvm_toolchain//:all")

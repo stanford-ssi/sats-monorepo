@@ -57,6 +57,7 @@ int main()
                blink resumes in phase rather than wherever it stopped. */
             led_on = gSlate.led_enabled && !led_on;
             gpio_put(LED_PIN, led_on);
+            printf("LED %s\n", led_on ? "on" : "off");
             if (led_on)
                 gSlate.cycle_counter++;
         }
