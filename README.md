@@ -140,3 +140,5 @@ bazel build --config=pico //:blink
 ``` bash
 uv run scripts/parse_slate.py bazel-bin/blink Slate --flat
 ```
+
+Some trivial change here!
