@@ -7,10 +7,12 @@ syntax = "proto3";
  * them with nanopb, the ground with protobuf. Uplink is ground -> satellite
  * (the spec's TX), Downlink is satellite -> ground (the spec's RX).
  *
- * Source: Ground Station Specification Sheet, section 1, which describes
- * SAMWISE's older fixed-layout frame. "spec:" comments record a size or
- * range from that layout that still bounds the value. Fields marked INFERRED
- * have a type or meaning the spec does not state outright.
+ * Sources: Ground Station Specification Sheet, section 1, which describes
+ * SAMWISE's older fixed-layout frame; SAMWISE's beacon_task.c and
+ * adcs_packet.h for the beacon; and src/tasks/ftp/README.md in
+ * samwise-flight-software for FTP. "spec:" comments record a size or range
+ * from those layouts that still bounds the value. Fields marked INFERRED
+ * have a type or meaning the sources do not state outright.
  */
 package sats.uhf;
 
@@ -47,54 +49,192 @@ message Frame {
  * ------------------------------------------------------------------------ */
 
 /**
- * Status flags in the beacon. The spec packs these into one byte; here a
- * false flag costs nothing on the wire and a true one costs two bytes.
+ * Device status flags in the beacon, from SAMWISE's get_device_status().
+ * SAMWISE packs these into one byte, bit 0 first; here a false flag costs
+ * nothing on the wire and a true one costs two bytes.
  */
 message BeaconStatus {
-  bool rbf = 1;            // INFERRED: remove-before-flight pin
-  bool charge = 2;         // INFERRED: battery charging
-  bool fault = 3;          // INFERRED: charger/power fault
-  bool panel_a = 4;        // INFERRED: "A" in the spec, taken as solar panel A
-  bool panel_b = 5;        // INFERRED: "B" in the spec, taken as solar panel B
-  bool payload = 6;        // INFERRED: payload powered
+  bool rbf_detected = 1;        // remove-before-flight pin present
+  bool fixed_solar_charge = 2;
+  bool fixed_solar_fault = 3;
+  bool panel_a_deployed = 4;
+  bool panel_b_deployed = 5;
+  bool payload_on = 6;
   bool adcs_on = 7;
-  bool adcs_bit7 = 8;      // INFERRED: label is cut off in the spec diagram ("a...")
+  bool adcs_telem_valid = 8;    // whether the adcs block below can be trusted
 }
 
-/* ADCS telemetry carried in the beacon. */
+/**
+ * ADCS telemetry, from SAMWISE's adcs_packet_t. The spec's beacon diagram
+ * shows only w, the quaternion, state and boot_count; the struct the beacon
+ * actually copies has every field below.
+ */
 message BeaconAdcs {
-  float w = 1;             // INFERRED: angular rate
-  float q0 = 2;            // attitude quaternion
+  float w = 1;              // angular velocity
+  float q0 = 2;             // attitude estimate quaternion
   float q1 = 3;
   float q2 = 4;
   float q3 = 5;
-  uint32 state = 6;        // spec: u8
+  uint32 state = 6;         // spec: one char
   uint32 boot_count = 7;
+  float mjd = 8;            // modified Julian date
+  float utc_time = 9;
+  float voltage = 10;       // INFERRED: units not given
+  float current = 11;       // INFERRED: units not given
+  float sun_body_x = 12;    // sun sensor, body frame
+  float sun_body_y = 13;
+  float sun_body_z = 14;
+  float mag_body_x = 15;    // magnetometer, body frame
+  float mag_body_y = 16;
+  float mag_body_z = 17;
+  float lon = 18;
+  float lat = 19;
+  float alt = 20;           // INFERRED: units not given
 }
 
 /* Sent by the satellite every 5000 ms. */
 message Beacon {
-  string state_name = 1;             // spec: up to 8 chars, e.g. "running"
-  string call_to_action = 2;         // spec: up to 9 chars
+  string state_name = 1;             // e.g. "running"
+  string call_to_action = 2;         // " beat cal!"
   uint32 reboot_counter = 3;
-  uint64 time_in_state_ms = 4;       // INFERRED: unsigned
+  uint64 time_in_state_ms = 4;
   uint32 rx_bytes = 5;
   uint32 rx_packets = 6;
   uint32 rx_backpressure_drops = 7;
   uint32 rx_bad_packet_drops = 8;
   uint32 tx_bytes = 9;
   uint32 tx_packets = 10;
-  uint32 battery_voltage_mv = 11;    // spec: 16 bits; INFERRED: unsigned
-  sint32 battery_current_ma = 12;    // spec: 16 bits; INFERRED: signed (charge vs discharge)
-  uint32 solar_voltage_mv = 13;      // legacy alias of panel A; spec: 16 bits; INFERRED: mV, unsigned
-  uint32 solar_current_ma = 14;      // legacy alias of panel A; spec: 16 bits; INFERRED: mA, unsigned
-  uint32 panel_a_voltage_mv = 15;    // spec: 16 bits; INFERRED: mV, unsigned
-  uint32 panel_a_current_ma = 16;    // spec: 16 bits; INFERRED: mA, unsigned
-  uint32 panel_b_voltage_mv = 17;    // spec: 16 bits; INFERRED: mV, unsigned
-  uint32 panel_b_current_ma = 18;    // spec: 16 bits; INFERRED: mA, unsigned
+  uint32 battery_voltage_mv = 11;    // spec: u16
+  uint32 battery_current_ma = 12;    // spec: u16, unsigned in SAMWISE
+  uint32 solar_voltage_mv = 13;      // spec: u16, legacy alias of panel A
+  uint32 solar_current_ma = 14;      // spec: u16, legacy alias of panel A
+  uint32 panel_a_voltage_mv = 15;    // spec: u16
+  uint32 panel_a_current_ma = 16;    // spec: u16
+  uint32 panel_b_voltage_mv = 17;    // spec: u16
+  uint32 panel_b_current_ma = 18;    // spec: u16
   BeaconStatus status = 19;
   BeaconAdcs adcs = 20;
-  string callsign = 21;              // spec: 6 chars, "KC3WNY"
+  string callsign = 21;              // spec: 6 chars; "KC3WNY" in the spec, "TEMPCS" in SAMWISE's code
+}
+
+/* ---------------------------------------------------------------------------
+ * FTP: write-only file upload to the satellite's filesystem
+ *
+ * Files are named by two bytes and sent in cycles of up to 256 packets; the
+ * satellite reports which packets of a cycle arrived and checks the whole
+ * file's CRC32 at the end. See src/tasks/ftp/README.md.
+ * ------------------------------------------------------------------------ */
+
+/* Begin uploading a file. Answered with FTP_RESULT_READY_RECEIVE. */
+message FtpStartFileWrite {
+  uint32 fname = 1;      // spec: u16
+  /* INFERRED: u32. The README's command body says u16, but its packet
+     diagram, design notes and 13,434,880 byte max file length need 32 bits. */
+  uint32 file_len = 2;
+  fixed32 file_crc = 3;  // CRC32 of the whole file
+}
+
+/* One packet of file data. Must fall inside the current cycle's range. */
+message FtpWriteToFile {
+  uint32 fname = 1;      // spec: u16
+  uint32 packet_id = 2;  // spec: u16
+  bytes data = 3;        // spec: up to 205 bytes
+}
+
+message FtpCancelFileWrite {
+  uint32 fname = 1;      // spec: u16
+}
+
+/* Wipe and reformat the filesystem. Destructive. */
+message FtpReformat {}
+
+message FtpRemoveFile {
+  uint32 fname = 1;      // spec: u16; not yet implemented in SAMWISE
+}
+
+message FtpCommand {
+  oneof command {
+    FtpStartFileWrite start_file_write = 1;
+    FtpWriteToFile write_to_file = 2;
+    FtpCancelFileWrite cancel_file_write = 3;
+    FtpReformat reformat = 4;
+    FtpRemoveFile remove_file = 5;
+  }
+}
+
+/**
+ * Result codes, numbered as in the FTP README so they match flight software.
+ * Negative values cost 10 bytes on the wire, but only error replies use them.
+ */
+enum FtpResult {
+  FTP_RESULT_UNSPECIFIED = 0;
+  FTP_RESULT_REFORMAT_SUCCESS = 1;
+  FTP_RESULT_READY_RECEIVE = 10;
+  FTP_RESULT_FILE_WRITE_SUCCESS = 11;      // cycle complete, next range follows
+  FTP_RESULT_EOF_SUCCESS = 20;             // whole file received, CRC matches
+  FTP_RESULT_CANCEL_SUCCESS = 30;
+  FTP_RESULT_STATUS_REPORT = 40;           // periodic, every 5 s during a transfer
+  FTP_RESULT_REMOVE_SUCCESS = 60;          // INFERRED: named in the README but given no value
+  FTP_RESULT_REFORMAT_ERROR = -1;
+  FTP_RESULT_FILESYS_INIT_ERROR = -2;
+  FTP_RESULT_FILE_WRITE_BUFFER_ERROR = -11;
+  FTP_RESULT_FILE_WRITE_MRAM_ERROR = -12;
+  FTP_RESULT_PACKET_OUT_OF_RANGE = -13;
+  FTP_RESULT_EOF_CRC_ERROR = -20;
+  FTP_RESULT_CANCEL_ERROR = -30;
+  FTP_RESULT_START_FILE_WRITE_ERROR = -50;
+  FTP_RESULT_ALREADY_WRITING_FILE = -51;
+  FTP_RESULT_NOT_WRITING_FILE = -52;
+  FTP_RESULT_REMOVE_ERROR = -60;           // INFERRED: named in the README but given no value
+  FTP_RESULT_ERROR = -99;
+}
+
+/* Packet range of the next cycle and what has arrived so far. Sent with
+   READY_RECEIVE (INFERRED), FILE_WRITE_SUCCESS and PACKET_OUT_OF_RANGE. */
+message FtpCycleStatus {
+  uint32 packet_start = 1;      // spec: u16, inclusive
+  uint32 packet_end = 2;        // spec: u16, inclusive
+  bytes received_bitfield = 3;  // spec: 32 bytes, bit set = packet received
+}
+
+/* Sent with STATUS_REPORT. Fields follow the README's FTP_STATUS_REPORT_DATA
+   struct, which differs slightly from its prose description. */
+message FtpStatusReport {
+  uint32 packet_start = 1;          // spec: u16, inclusive
+  uint32 packet_end = 2;            // spec: u16, inclusive
+  bytes received_bitfield = 3;      // spec: 32 bytes
+  fixed32 file_crc_so_far = 4;      // 0 before the first cycle is written
+  uint32 total_bytes_written = 5;
+  bool filesys_buffer_malloced = 6;
+  bool filesys_is_writing_file = 7;
+}
+
+/* Sent with EOF_SUCCESS and EOF_CRC_ERROR; both values are computed on disk. */
+message FtpEof {
+  fixed32 computed_crc = 1;
+  uint32 file_len = 2;
+}
+
+/* Sent when a filesystem or LittleFS call caused the failure. */
+message FtpFilesysError {
+  sint32 filesys_error = 1;
+  sint32 lfs_error = 2;    // LFS_ERR_OK if the error came only from Filesys
+  sint32 blocks_left = 3;  // only for START_FILE_WRITE_ERROR, -1 if not computed
+}
+
+message FtpResponse {
+  /* The transfer in progress, as given at start (not computed). With no
+     transfer running: fname is "XX" as two ASCII bytes, the rest 0. */
+  uint32 fname = 1;      // spec: u16
+  uint32 file_len = 2;
+  fixed32 file_crc = 3;
+  FtpResult result = 4;
+  oneof detail {
+    FtpCycleStatus cycle_status = 5;
+    FtpStatusReport status_report = 6;
+    FtpEof eof = 7;
+    FtpFilesysError filesys_error = 8;
+  }
 }
 
 message Downlink {
@@ -104,7 +244,7 @@ message Downlink {
     /* Reply to an uplinked command; replaces the spec's
        "Number of commands processed: %d" text response. */
     SatResponse sat_response = 3;
-    bytes ftp = 4;  // INFERRED: FTP format lives in a separate doc, left raw until it is modelled
+    FtpResponse ftp = 4;
   }
 }
 
@@ -177,7 +317,7 @@ message Uplink {
     PayloadShutdown payload_shutdown = 8;
     PayloadExec payload_exec = 9;
     AdcsCommand adcs_command = 10;
-    bytes ftp = 11;  // INFERRED: FTP format lives in a separate doc, left raw until it is modelled
+    FtpCommand ftp = 11;
   }
   // The ADCS file packet is unimplemented and its format (JSON/YAML) undecided.
 }
