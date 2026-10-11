@@ -34,7 +34,7 @@ message SsdvFlags {
   SubsamplingMode subsampling = 3;      // wire: 2 bits
 }
 
-message RxPacket {
+message Downlink {
   // The 0x55 sync byte at offset 0 is a constant and is not stored.
   PacketType packet_type = 1;
   string callsign = 2;     // wire: 4 bytes base-40; INFERRED: holds the decoded string, up to 6 chars

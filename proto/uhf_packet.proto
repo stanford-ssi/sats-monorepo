@@ -3,8 +3,9 @@ syntax = "proto3";
 /**
  * 433 MHz (UHF) link between SAMWISE and the ground station.
  *
- * Source: Ground Station Specification Sheet, section 1. Naming follows that
- * doc: RX is SAMWISE -> ground station, TX is ground station -> SAMWISE.
+ * Source: Ground Station Specification Sheet, section 1. The spec's RX is
+ * Downlink (satellite -> ground) and its TX is Uplink (ground -> satellite);
+ * uplink and downlink read the same from either end of the link.
  *
  * These messages are the decoded form of a packet, not its byte layout. The
  * on-air frame is a fixed-width struct parsed on the Dell controller; the
@@ -14,21 +15,21 @@ syntax = "proto3";
 package sats.uhf;
 
 /* Node codes used in src and dst. */
-enum Address {
-  ADDRESS_UNSPECIFIED = 0;
-  ADDRESS_SAMWISE = 128;
-  ADDRESS_GROUND_STATION = 129;
-  ADDRESS_BROADCAST = 255; // "Anyone (*)"
+enum NodeAddress {
+  NODE_ADDRESS_UNSPECIFIED = 0;
+  NODE_ADDRESS_SAMWISE = 128;
+  NODE_ADDRESS_GROUND_STATION = 129;
+  NODE_ADDRESS_BROADCAST = 255;  // "Anyone (*)"
   // TODO: radio repeat code is TBD in the spec.
 }
 
 /**
  * Fields common to every UHF frame in both directions. Protobuf has no
- * inheritance, so RxPacket and TxPacket hold one of these as a field.
+ * inheritance, so Uplink and Downlink hold one of these as a field.
  */
-message AbstractPacket {
-  Address dst = 1;        // wire: u8
-  Address src = 2;        // wire: u8
+message Frame {
+  NodeAddress dst = 1;    // wire: u8
+  NodeAddress src = 2;    // wire: u8
   uint32 flags = 3;       // wire: u8, set by the RadioHead driver, mostly ignorable
   uint32 seq = 4;         // wire: u8, increments per packet to catch reordering and duplicates
   uint32 len = 5;         // wire: u8, number of valid bytes in data
@@ -38,7 +39,7 @@ message AbstractPacket {
 }
 
 /* ---------------------------------------------------------------------------
- * RX: SAMWISE -> ground station
+ * Downlink: satellite -> ground station
  * ------------------------------------------------------------------------ */
 
 /* Packed status byte in the beacon. Wire: one u8, one flag per bit. */
@@ -98,8 +99,8 @@ message CommandResponse {
   string text = 1;  // wire: null terminated string after the COMMAND_RESPONSE id byte
 }
 
-message RxPacket {
-  AbstractPacket packet = 1;
+message Downlink {
+  Frame frame = 1;
   oneof payload {
     Beacon beacon = 2;
     CommandResponse command_response = 3;
@@ -108,7 +109,7 @@ message RxPacket {
 }
 
 /* ---------------------------------------------------------------------------
- * TX: ground station -> SAMWISE
+ * Uplink: ground station -> satellite
  *
  * On the wire, the first byte of data is the command id and the rest is the
  * command's arguments. The oneof field numbers below are NOT those ids; the
@@ -149,14 +150,14 @@ message PayloadExec {
 
 /**
  * One byte relayed by picubed to the ADCS board. The spec lists this under
- * RX, but it is sent from the ground, so it is modelled as TX.
+ * RX, but it is sent from the ground, so it is modelled as an uplink.
  */
 message AdcsCommand {
   uint32 command = 1;  // wire: u8, 0 to 127
 }
 
-message TxPacket {
-  AbstractPacket packet = 1;
+message Uplink {
+  Frame frame = 1;
   bytes hmac = 2;  // wire: 32 bytes, SHA-256 HMAC, only checked on SAMWISE
   oneof command {
     Ping ping = 3;
