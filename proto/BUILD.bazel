@@ -12,3 +12,14 @@ cc_nanopb_proto_library(
     nanopb_options_files = ["sats_command.options"],
     visibility = ["//visibility:public"],
 )
+
+proto_library(
+    name = "uhf_packet_proto",
+    srcs = ["uhf_packet.proto"],
+    deps = [":sats_command_proto"],
+)
+
+proto_library(
+    name = "sband_packet_proto",
+    srcs = ["sband_packet.proto"],
+)

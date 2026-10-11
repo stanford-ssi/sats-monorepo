@@ -1,18 +1,20 @@
 syntax = "proto3";
 
 /**
- * 433 MHz (UHF) link between SAMWISE and the ground station.
+ * 433 MHz (UHF) link between the satellite and the ground station.
  *
- * Source: Ground Station Specification Sheet, section 1. The spec's RX is
- * Downlink (satellite -> ground) and its TX is Uplink (ground -> satellite);
- * uplink and downlink read the same from either end of the link.
+ * These messages are the on-air format: flight software encodes and decodes
+ * them with nanopb, the ground with protobuf. Uplink is ground -> satellite
+ * (the spec's TX), Downlink is satellite -> ground (the spec's RX).
  *
- * These messages are the decoded form of a packet, not its byte layout. The
- * on-air frame is a fixed-width struct parsed on the Dell controller; the
- * "wire:" comments record the width each field has there. Fields marked
- * INFERRED have a type or meaning the spec does not state outright.
+ * Source: Ground Station Specification Sheet, section 1, which describes
+ * SAMWISE's older fixed-layout frame. "spec:" comments record a size or
+ * range from that layout that still bounds the value. Fields marked INFERRED
+ * have a type or meaning the spec does not state outright.
  */
 package sats.uhf;
+
+import "proto/sats_command.proto";
 
 /* Node codes used in src and dst. */
 enum NodeAddress {
@@ -24,25 +26,30 @@ enum NodeAddress {
 }
 
 /**
- * Fields common to every UHF frame in both directions. Protobuf has no
+ * Fields common to every UHF packet in both directions. Protobuf has no
  * inheritance, so Uplink and Downlink hold one of these as a field.
+ *
+ * dst, src, flags and seq are what the RadioHead driver puts in its own
+ * 4 byte header. If flight software keeps that driver, drop them here rather
+ * than send them twice.
  */
 message Frame {
-  NodeAddress dst = 1;    // wire: u8
-  NodeAddress src = 2;    // wire: u8
-  uint32 flags = 3;       // wire: u8, set by the RadioHead driver, mostly ignorable
-  uint32 seq = 4;         // wire: u8, increments per packet to catch reordering and duplicates
-  uint32 len = 5;         // wire: u8, number of valid bytes in data
-  bytes data = 6;         // wire: 210 bytes, raw and undecoded, kept for logging
-  uint32 boot_count = 7;  // wire: u32, satellite reboot count, required by law
-  uint32 msg_id = 8;      // INFERRED: in the frame diagram (u32) but never described in the text
+  NodeAddress dst = 1;
+  NodeAddress src = 2;
+  uint32 flags = 3;       // spec: u8, set by the RadioHead driver, mostly ignorable
+  uint32 seq = 4;         // spec: u8, wraps at 256; catches reordering and duplicates
+  uint32 boot_count = 5;  // satellite reboot count, required by law
+  uint32 msg_id = 6;      // INFERRED: in the spec's frame diagram (u32) but never described
 }
 
 /* ---------------------------------------------------------------------------
  * Downlink: satellite -> ground station
  * ------------------------------------------------------------------------ */
 
-/* Packed status byte in the beacon. Wire: one u8, one flag per bit. */
+/**
+ * Status flags in the beacon. The spec packs these into one byte; here a
+ * false flag costs nothing on the wire and a true one costs two bytes.
+ */
 message BeaconStatus {
   bool rbf = 1;            // INFERRED: remove-before-flight pin
   bool charge = 2;         // INFERRED: battery charging
@@ -51,79 +58,75 @@ message BeaconStatus {
   bool panel_b = 5;        // INFERRED: "B" in the spec, taken as solar panel B
   bool payload = 6;        // INFERRED: payload powered
   bool adcs_on = 7;
-  bool adcs_bit7 = 8;      // INFERRED: label is cut off in the spec diagram ("a..."); bit order also unconfirmed
+  bool adcs_bit7 = 8;      // INFERRED: label is cut off in the spec diagram ("a...")
 }
 
 /* ADCS telemetry carried in the beacon. */
 message BeaconAdcs {
-  float w = 1;             // wire: f32, INFERRED: angular rate
-  float q0 = 2;            // wire: f32, attitude quaternion
-  float q1 = 3;            // wire: f32
-  float q2 = 4;            // wire: f32
-  float q3 = 5;            // wire: f32
-  uint32 state = 6;        // wire: u8
-  uint32 boot_count = 7;   // wire: u32
+  float w = 1;             // INFERRED: angular rate
+  float q0 = 2;            // attitude quaternion
+  float q1 = 3;
+  float q2 = 4;
+  float q3 = 5;
+  uint32 state = 6;        // spec: u8
+  uint32 boot_count = 7;
 }
 
-/* Sent by SAMWISE every 5000 ms. */
+/* Sent by the satellite every 5000 ms. */
 message Beacon {
-  string state_name = 1;             // wire: 9 bytes, null terminated, e.g. "running"
-  string call_to_action = 2;         // wire: 10 bytes, null terminated
-  uint32 reboot_counter = 3;         // wire: u32
-  uint64 time_in_state_ms = 4;       // wire: 64 bits, INFERRED: unsigned
-  uint32 rx_bytes = 5;               // wire: u32
-  uint32 rx_packets = 6;             // wire: u32
-  uint32 rx_backpressure_drops = 7;  // wire: u32
-  uint32 rx_bad_packet_drops = 8;    // wire: u32
-  uint32 tx_bytes = 9;               // wire: u32
-  uint32 tx_packets = 10;            // wire: u32
-  uint32 battery_voltage_mv = 11;    // wire: 16 bits, INFERRED: unsigned
-  sint32 battery_current_ma = 12;    // wire: 16 bits, INFERRED: signed (charge vs discharge)
-  uint32 solar_voltage_mv = 13;      // wire: 16 bits, legacy alias of panel A, INFERRED: mV, unsigned
-  uint32 solar_current_ma = 14;      // wire: 16 bits, legacy alias of panel A, INFERRED: mA, unsigned
-  uint32 panel_a_voltage_mv = 15;    // wire: 16 bits, INFERRED: mV, unsigned
-  uint32 panel_a_current_ma = 16;    // wire: 16 bits, INFERRED: mA, unsigned
-  uint32 panel_b_voltage_mv = 17;    // wire: 16 bits, INFERRED: mV, unsigned
-  uint32 panel_b_current_ma = 18;    // wire: 16 bits, INFERRED: mA, unsigned
-  BeaconStatus status = 19;          // wire: u8
+  string state_name = 1;             // spec: up to 8 chars, e.g. "running"
+  string call_to_action = 2;         // spec: up to 9 chars
+  uint32 reboot_counter = 3;
+  uint64 time_in_state_ms = 4;       // INFERRED: unsigned
+  uint32 rx_bytes = 5;
+  uint32 rx_packets = 6;
+  uint32 rx_backpressure_drops = 7;
+  uint32 rx_bad_packet_drops = 8;
+  uint32 tx_bytes = 9;
+  uint32 tx_packets = 10;
+  uint32 battery_voltage_mv = 11;    // spec: 16 bits; INFERRED: unsigned
+  sint32 battery_current_ma = 12;    // spec: 16 bits; INFERRED: signed (charge vs discharge)
+  uint32 solar_voltage_mv = 13;      // legacy alias of panel A; spec: 16 bits; INFERRED: mV, unsigned
+  uint32 solar_current_ma = 14;      // legacy alias of panel A; spec: 16 bits; INFERRED: mA, unsigned
+  uint32 panel_a_voltage_mv = 15;    // spec: 16 bits; INFERRED: mV, unsigned
+  uint32 panel_a_current_ma = 16;    // spec: 16 bits; INFERRED: mA, unsigned
+  uint32 panel_b_voltage_mv = 17;    // spec: 16 bits; INFERRED: mV, unsigned
+  uint32 panel_b_current_ma = 18;    // spec: 16 bits; INFERRED: mA, unsigned
+  BeaconStatus status = 19;
   BeaconAdcs adcs = 20;
-  string callsign = 21;              // wire: 6 bytes, "KC3WNY"
-}
-
-/**
- * Reply to a command, e.g. PING/NO_OP answers with
- * "Number of commands processed: %d". The spec flags this format as one that
- * should change, so it is kept as text rather than parsed.
- */
-message CommandResponse {
-  string text = 1;  // wire: null terminated string after the COMMAND_RESPONSE id byte
+  string callsign = 21;              // spec: 6 chars, "KC3WNY"
 }
 
 message Downlink {
   Frame frame = 1;
   oneof payload {
     Beacon beacon = 2;
-    CommandResponse command_response = 3;
+    /* Reply to an uplinked command; replaces the spec's
+       "Number of commands processed: %d" text response. */
+    SatResponse sat_response = 3;
     bytes ftp = 4;  // INFERRED: FTP format lives in a separate doc, left raw until it is modelled
   }
 }
 
 /* ---------------------------------------------------------------------------
  * Uplink: ground station -> satellite
- *
- * On the wire, the first byte of data is the command id and the rest is the
- * command's arguments. The oneof field numbers below are NOT those ids; the
- * ids are defined by flight software.
  * ------------------------------------------------------------------------ */
 
-message Ping {}             // no arguments
-message PayloadTurnOn {}    // no arguments
-message PayloadTurnOff {}   // no arguments
-message PayloadShutdown {}  // no arguments; behaviour still being planned in samwise-flight-software#313
+/* Liveness check, answered with a SatResponse carrying STATUS_OK. */
+message Ping {}
+
+/* Power the payload up or down. Either could become a SatCmd bool write if
+   flight software polls a payload enable field in the slate. */
+message PayloadTurnOn {}
+message PayloadTurnOff {}
+
+/* Behaviour still being planned in samwise-flight-software#313. */
+message PayloadShutdown {}
 
 /**
- * INFERRED: the spec sends the state as a string. It is an enum here so only
- * known states can be built; the comments give the string each maps to.
+ * INFERRED: the spec sends the state as a string. An enum is smaller and only
+ * lets known states be sent. Names are SAMWISE's; check them against the new
+ * flight software's state machine.
  */
 enum SatState {
   SAT_STATE_UNSPECIFIED = 0;
@@ -133,14 +136,15 @@ enum SatState {
   SAT_STATE_BURN_WIRE_RESET = 4;  // "burn_wire_reset_state"
 }
 
-/* Force SAMWISE into a state. */
+/* Force the satellite into a state. A command rather than a slate write,
+   since entering a state like burn wire has side effects. */
 message ManualStateOverride {
-  SatState state = 1;  // wire: null terminated string, up to 208 bytes + terminator
+  SatState state = 1;
 }
 
 /**
- * Forward a command to the payload over UART. On the wire this is the JSON
- * string ["command_name", [args], {kwargs}].
+ * Forward a command to the payload over UART. The satellite rebuilds the
+ * payload's JSON string ["command_name", [args], {kwargs}] from these.
  */
 message PayloadExec {
   string command_name = 1;  // a key of NAMES_TO_COMMANDS in payload/commands.py
@@ -153,21 +157,27 @@ message PayloadExec {
  * RX, but it is sent from the ground, so it is modelled as an uplink.
  */
 message AdcsCommand {
-  uint32 command = 1;  // wire: u8, 0 to 127
+  uint32 command = 1;  // spec: 0 to 127
 }
 
 message Uplink {
   Frame frame = 1;
-  bytes hmac = 2;  // wire: 32 bytes, SHA-256 HMAC, only checked on SAMWISE
+  /* HMAC-SHA256 (32 bytes), checked by the satellite.
+     TODO: decide exactly which bytes it covers. Protobuf encoding is not
+     canonical, so it cannot be "re-encode this message without the hmac";
+     the satellite must verify over the bytes it actually received. */
+  bytes hmac = 2;
   oneof command {
-    Ping ping = 3;
-    ManualStateOverride manual_state_override = 4;
-    PayloadTurnOn payload_turn_on = 5;
-    PayloadTurnOff payload_turn_off = 6;
-    PayloadShutdown payload_shutdown = 7;
-    PayloadExec payload_exec = 8;
-    AdcsCommand adcs_command = 9;
-    bytes ftp = 10;  // INFERRED: FTP format lives in a separate doc, left raw until it is modelled
+    /* Read or write a slate field by offset; see sats_command.proto. */
+    SatCmd sat_cmd = 3;
+    Ping ping = 4;
+    ManualStateOverride manual_state_override = 5;
+    PayloadTurnOn payload_turn_on = 6;
+    PayloadTurnOff payload_turn_off = 7;
+    PayloadShutdown payload_shutdown = 8;
+    PayloadExec payload_exec = 9;
+    AdcsCommand adcs_command = 10;
+    bytes ftp = 11;  // INFERRED: FTP format lives in a separate doc, left raw until it is modelled
   }
   // The ADCS file packet is unimplemented and its format (JSON/YAML) undecided.
 }
