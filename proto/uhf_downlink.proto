@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+/**
+ * 433 MHz (UHF) downlink between the satellite and the ground station.
+ * Beacon downlinks reference https://github.com/stanford-ssi/samwise-flight-software/tree/main/src/tasks/beacon
+ * and https://github.com/stanford-ssi/samwise-flight-software/blob/main/src/packet/adcs_packet.h
+ *
+ * TODO: Can we deprecate Beacon.boot_count? Is this the same as boot_count in the Header?
+ */
+
+package sats.uhf;
+
+import "proto/sats_command.proto";
+import "proto/uhf_ftp.proto";
+import "proto/uhf_header.proto";
+
+/**
+ * Device status flags in the beacon, from SAMWISE's get_device_status().
+ * Possible to compact this to 1 byte (current implementation is inefficient since Protobuf tags bools) but we have enough space as of now.
+ */
+message BeaconStatus {
+  bool rbf_detected = 1; // remove-before-flight pin present
+  bool fixed_solar_charge = 2;
+  bool fixed_solar_fault = 3;
+  bool panel_a_deployed = 4;
+  bool panel_b_deployed = 5;
+  bool payload_on = 6;
+  bool adcs_on = 7;
+  bool adcs_telem_valid = 8; // whether the adcs block below can be trusted
+}
+
+/**
+ * ADCS telemetry, from SAMWISE's adcs_packet_t.
+ */
+message BeaconAdcs {
+  float w = 1; // angular velocity
+  float q0 = 2; // attitude estimate quaternion
+  float q1 = 3;
+  float q2 = 4;
+  float q3 = 5;
+  float mjd = 6; // modified Julian date
+  float utc_time = 7;
+  float voltage = 8; // power
+  float current = 9;
+  float sun_body_x = 10; // sun sensor, body frame
+  float sun_body_y = 11;
+  float sun_body_z = 12;
+  float mag_body_x = 13; // magnetometer, body frame
+  float mag_body_y = 14;
+  float mag_body_z = 15;
+  float lon = 16; // position
+  float lat = 17;
+  float alt = 18;
+  uint32 state = 19; // spec: one char
+  uint32 boot_count = 20; // the ADCS board's own boot count, not the satellite's
+}
+
+/* Sent by the satellite every 5000 ms. From SAMWISE's beacon_task.c. */
+message Beacon {
+  string callsign = 1; // spec: 6 chars
+  string call_to_action = 2; // "beat cal!"
+  string state_name = 3; // e.g. "running"
+  uint32 reboot_counter = 4;
+  uint64 time_in_state_ms = 5;
+  uint32 rx_bytes = 6;
+  uint32 rx_packets = 7;
+  uint32 rx_backpressure_drops = 8;
+  uint32 rx_bad_packet_drops = 9;
+  uint32 tx_bytes = 10;
+  uint32 tx_packets = 11;
+  uint32 battery_voltage_mv = 12; // spec: u16
+  uint32 battery_current_ma = 13; // spec: u16, unsigned in SAMWISE
+  uint32 panel_a_voltage_mv = 14; // spec: u16
+  uint32 panel_a_current_ma = 15; // spec: u16
+  uint32 panel_b_voltage_mv = 16; // spec: u16
+  uint32 panel_b_current_ma = 17; // spec: u16
+  BeaconStatus status = 18;
+  BeaconAdcs adcs = 19;
+}
+
+message Downlink {
+  Header header = 1;
+  oneof payload {
+    Beacon beacon = 2;
+    SatResponse sat_response = 3;
+    FtpResponse ftp = 4;
+  }
+}
