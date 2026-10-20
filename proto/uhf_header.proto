@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+/**
+ * Common header shared by uplink and downlink packets for 433 MHz (UHF) communication.
+ * Excludes NodeAddress dst, NodeAddress src, uint32 flags, uint32 seq. These 4 fields are written by RadioHead and this avoids duplication.
+ *
+ * On-air layout:
+ *   byte 0   to     NodeAddress, set and filtered by RadioHead
+ *   byte 1   from   NodeAddress
+ *   byte 2   id     sequence number, wraps at 256
+ *   byte 3   flags
+ *   byte 4+  protobuf-encoded Uplink or Downlink
+ *   last 32  uplink only: HMAC-SHA256 over every byte before it
+ *
+ * The RadioHead bytes and the HMAC are raw, not protobuf. Especially for HMAC, so we don't need to decode bytes to verify packets.
+ * NodeAddress is defined here so both ends agree on the values.
+ */
+
+package sats.uhf;
+
+/* Node codes used in RadioHead's to and from bytes. */
+enum NodeAddress {
+  NODE_ADDRESS_UNSPECIFIED = 0;
+  NODE_ADDRESS_SAMWISE = 128;
+  NODE_ADDRESS_GROUND_STATION = 129;
+  NODE_ADDRESS_BROADCAST = 255; // "Anyone (*)"
+  // TODO: radio repeat code is TBD in the spec.
+}
+
+message Header {
+  uint32 boot_count = 1;
+  uint32 msg_id = 2;
+}

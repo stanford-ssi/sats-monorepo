@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+/**
+ * 433 MHz (UHF) uplink from the ground station to the satellite.
+ * Commands follow the Ground Station Specification Sheet's TX list and
+ * https://github.com/stanford-ssi/samwise-flight-software/blob/main/src/tasks/command/command_parser.c
+ *
+ * Every uplink packet ends in a 32 byte HMAC outside this message; see the on-air layout in uhf_header.proto.
+ */
+
+package sats.uhf;
+
+import "proto/sats_command.proto";
+import "proto/uhf_ftp.proto";
+import "proto/uhf_header.proto";
+
+/* Liveness check, answered with a SatResponse carrying STATUS_OK. */
+message Ping {}
+
+/* Power the payload up or down. */
+message PayloadTurnOn {}
+message PayloadTurnOff {}
+
+/**
+ * Stop transmitting and responding until a timeout, per samwise-flight-software#313.
+ * Takes effect only when received 3 times in a row, and the satellite returns to running after 3 months.
+ *
+ * TODO: rename to RadioSilence; it silences the whole satellite, not just the payload.
+ */
+message PayloadShutdown {}
+
+/* Force the satellite into a state. A command rather than a slate write,
+   since entering a state like burn wire has side effects. */
+enum SatState {
+  SAT_STATE_UNSPECIFIED = 0; // SAMWISE's STATE_NONE, sent for an unknown name
+  SAT_STATE_RUNNING = 1; // "running_state"
+  SAT_STATE_INIT = 2; // "init_state"
+  SAT_STATE_BURN_WIRE = 3; // "burn_wire_state"
+  SAT_STATE_BURN_WIRE_RESET = 4; // "burn_wire_reset_state"
+}
+
+message ManualStateOverride {
+  SatState state = 1;
+}
+
+/**
+ * Forward a command to the payload over UART. The satellite rebuilds the
+ * payload's JSON string ["command_name", [args], {kwargs}] from these.
+ */
+message PayloadExec {
+  string command_name = 1; // a key of NAMES_TO_COMMANDS in payload/commands.py
+  string args_json = 2; // INFERRED: JSON array, kept as text since args are untyped
+  string kwargs_json = 3; // INFERRED: JSON object, kept as text since kwargs are untyped
+}
+
+/* One byte relayed by picubed to the ADCS board. */
+message AdcsCommand {
+  uint32 command = 1; // spec: 0 to 127
+}
+
+message Uplink {
+  Header header = 1;
+  oneof command {
+    SatCmd sat_cmd = 2;
+    Ping ping = 3;
+    ManualStateOverride manual_state_override = 4;
+    PayloadTurnOn payload_turn_on = 5;
+    PayloadTurnOff payload_turn_off = 6;
+    PayloadShutdown payload_shutdown = 7;
+    PayloadExec payload_exec = 8;
+    AdcsCommand adcs_command = 9;
+    FtpCommand ftp = 10;
+  }
+}

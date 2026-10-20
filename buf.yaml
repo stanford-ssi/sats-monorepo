@@ -1,0 +1,16 @@
+version: v2
+modules:
+  # Imports are written from the repo root ("proto/foo.proto"), as Bazel builds them.
+  - path: .
+    includes:
+      - proto
+lint:
+  use:
+    - STANDARD
+  except:
+    # Our protos live flat in proto/ with unversioned packages, and
+    # sats_command.proto has no package yet; these rules assume otherwise.
+    - PACKAGE_DIRECTORY_MATCH
+    - PACKAGE_VERSION_SUFFIX
+    - DIRECTORY_SAME_PACKAGE
+    - PACKAGE_DEFINED
