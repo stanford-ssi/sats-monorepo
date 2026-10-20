@@ -4,8 +4,6 @@ syntax = "proto3";
  * 433 MHz (UHF) downlink between the satellite and the ground station.
  * Beacon downlinks reference https://github.com/stanford-ssi/samwise-flight-software/tree/main/src/tasks/beacon
  * and https://github.com/stanford-ssi/samwise-flight-software/blob/main/src/packet/adcs_packet.h
- *
- * TODO: Can we deprecate Beacon.boot_count? Is this the same as boot_count in the Header?
  */
 
 package sats.uhf;
@@ -55,27 +53,28 @@ message BeaconAdcs {
   uint32 boot_count = 20; // the ADCS board's own boot count, not the satellite's
 }
 
-/* Sent by the satellite every 5000 ms. From SAMWISE's beacon_task.c. */
+/**
+ * Sent by the satellite every 5000 ms. From SAMWISE's beacon_task.c.
+ */
 message Beacon {
   string callsign = 1; // spec: 6 chars
   string call_to_action = 2; // "beat cal!"
   string state_name = 3; // e.g. "running"
-  uint32 reboot_counter = 4;
-  uint64 time_in_state_ms = 5;
-  uint32 rx_bytes = 6;
-  uint32 rx_packets = 7;
-  uint32 rx_backpressure_drops = 8;
-  uint32 rx_bad_packet_drops = 9;
-  uint32 tx_bytes = 10;
-  uint32 tx_packets = 11;
-  uint32 battery_voltage_mv = 12; // spec: u16
-  uint32 battery_current_ma = 13; // spec: u16, unsigned in SAMWISE
-  uint32 panel_a_voltage_mv = 14; // spec: u16
-  uint32 panel_a_current_ma = 15; // spec: u16
-  uint32 panel_b_voltage_mv = 16; // spec: u16
-  uint32 panel_b_current_ma = 17; // spec: u16
-  BeaconStatus status = 18;
-  BeaconAdcs adcs = 19;
+  uint64 time_in_state_ms = 4;
+  uint32 rx_bytes = 5;
+  uint32 rx_packets = 6;
+  uint32 rx_backpressure_drops = 7;
+  uint32 rx_bad_packet_drops = 8;
+  uint32 tx_bytes = 9;
+  uint32 tx_packets = 10;
+  uint32 battery_voltage_mv = 11; // spec: u16
+  uint32 battery_current_ma = 12; // spec: u16, unsigned in SAMWISE
+  uint32 panel_a_voltage_mv = 13; // spec: u16
+  uint32 panel_a_current_ma = 14; // spec: u16
+  uint32 panel_b_voltage_mv = 15; // spec: u16
+  uint32 panel_b_current_ma = 16; // spec: u16
+  BeaconStatus status = 17;
+  BeaconAdcs adcs = 18;
 }
 
 message Downlink {
