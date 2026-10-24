@@ -13,7 +13,7 @@ def gravity_force_moment(
 ) -> ForceMoment:
     return ForceMoment(
         force_eci_n=_gravity_force_eci_n(state.position_eci_m, satellite.mass_kg),
-        moment_eci_nm=_gravity_gradient_moment_eci_nm(
+        moment_body_nm=_gravity_gradient_moment_body_nm(
             state.position_eci_m,
             state.quat_eci_to_body,
             satellite.inertia_body_kgm2,
@@ -29,7 +29,7 @@ def _gravity_force_eci_n(position_eci_m: FloatArray, mass_kg: float) -> FloatArr
     return mass_kg * acceleration_eci_m_per_s2
 
 
-def _gravity_gradient_moment_eci_nm(
+def _gravity_gradient_moment_body_nm(
     _position_eci_m: FloatArray,
     _quat_eci_to_body: Quaternion,
     _inertia_body_kgm2: FloatArray,
@@ -50,4 +50,4 @@ def test_gravity_force_moment() -> None:
     force_moment = gravity_force_moment(state, satellite)
 
     assert np.all(force_moment.force_eci_n[:2] < 0.0)
-    np.testing.assert_array_equal(force_moment.moment_eci_nm, np.zeros(3))
+    np.testing.assert_array_equal(force_moment.moment_body_nm, np.zeros(3))

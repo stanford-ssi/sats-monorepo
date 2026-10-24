@@ -13,12 +13,12 @@ FloatArray = NDArray[np.float64]
 @dataclass(frozen=True)
 class ForceMoment:
     force_eci_n: FloatArray
-    moment_eci_nm: FloatArray
+    moment_body_nm: FloatArray
 
     def __add__(self, other: "ForceMoment") -> "ForceMoment":
         return ForceMoment(
             self.force_eci_n + other.force_eci_n,
-            self.moment_eci_nm + other.moment_eci_nm,
+            self.moment_body_nm + other.moment_body_nm,
         )
 
 
