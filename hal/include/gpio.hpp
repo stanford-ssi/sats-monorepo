@@ -25,5 +25,5 @@ public:
 private:
     GpioHardware &hardware_;
 
-    Gpio(GpioHardware &hardware) : hardware_(hardware){};
+    Gpio(GpioHardware &hardware) : hardware_(hardware) {};
 };

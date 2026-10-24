@@ -40,7 +40,7 @@ def derivative(
         ),
     )
 
-    # Resolve angular acceleration in ECI. 
+    # Resolve angular acceleration in ECI.
     angular_acceleration_body_wrt_eci_eci_rad_per_s2 = (
         dcm_eci_to_body.T @ angular_acceleration_body_wrt_eci_body_rad_per_s2
     )
