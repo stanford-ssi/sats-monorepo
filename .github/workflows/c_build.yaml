@@ -27,8 +27,8 @@ jobs:
       - name: Run host tests
         run: bazel test //... --test_output=errors
 
-      - name: Run python tests
-        run: uv run pytest -v
+      - name: Run Python tests
+        run: uv run --locked pytest -v
 
   firmware-build:
     name: RP2350 firmware

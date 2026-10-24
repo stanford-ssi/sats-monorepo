@@ -26,19 +26,25 @@ dev = [
     "pre-commit>=4.3.0",
     "pytest>=9.1.1",
     "ruff>=0.16.7",
+    "arda",
 ]
 
+[tool.uv.sources]
+arda = { workspace = true }
+
+[tool.uv.workspace]
+members = ["sim"]
+
 [tool.pytest.ini_options]
-# The ground scripts are the only python in the tree; keep pytest out of
-# bazel-bin and friends.
-testpaths = ["scripts"]
+testpaths = ["scripts/tests", "sim/arda", "sim/scenarios"]
+python_files = ["*.py"]
 
 [tool.ruff]
 # 88 is ruff's default and the code already sits close to it; the C++ side
 # is at 80 because embedded code is read in narrower splits.
 line-length = 88
 # So that `import cobs` and friends are sorted as first party, not third.
-src = ["scripts", "src"]
+src = ["scripts", "sim", "src"]
 
 [tool.ruff.lint]
 select = [
