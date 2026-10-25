@@ -46,16 +46,16 @@ class State:
 
 @dataclass(frozen=True)
 class StateDerivative:
-    position_eci_m_per_s: FloatArray
-    velocity_eci_m_per_s2: FloatArray
+    velocity_eci_m_per_s: FloatArray
+    acceleration_eci_m_per_s2: FloatArray
     quat_dot_eci_to_body_per_s: FloatArray
     angular_acceleration_body_wrt_eci_eci_rad_per_s2: FloatArray
 
     def as_array(self) -> FloatArray:
         return np.concatenate(
             (
-                self.position_eci_m_per_s,
-                self.velocity_eci_m_per_s2,
+                self.velocity_eci_m_per_s,
+                self.acceleration_eci_m_per_s2,
                 self.quat_dot_eci_to_body_per_s,
                 self.angular_acceleration_body_wrt_eci_eci_rad_per_s2,
             )

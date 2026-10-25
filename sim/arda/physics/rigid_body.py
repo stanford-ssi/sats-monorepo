@@ -45,8 +45,8 @@ def derivative(
         dcm_eci_to_body.T @ angular_acceleration_body_wrt_eci_body_rad_per_s2
     )
     return StateDerivative(
-        position_eci_m_per_s=state.velocity_eci_m_per_s,
-        velocity_eci_m_per_s2=force_moment.force_eci_n / satellite.mass_kg,
+        velocity_eci_m_per_s=state.velocity_eci_m_per_s,
+        acceleration_eci_m_per_s2=force_moment.force_eci_n / satellite.mass_kg,
         quat_dot_eci_to_body_per_s=quat_dot_eci_to_body_per_s,
         angular_acceleration_body_wrt_eci_eci_rad_per_s2=(
             angular_acceleration_body_wrt_eci_eci_rad_per_s2
