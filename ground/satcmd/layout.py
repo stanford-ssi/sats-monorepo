@@ -42,7 +42,7 @@ KIND_BY_ENCODING = {
     DW_ATE_UTF: "uint",
 }
 
-FLOAT_FORMATS = {4: "<f", 8: "<d"}
+FLOAT_FORMATS = {4: "<f"}  # the protocol tops out at 32 bits
 
 # What a human might reasonably type for a bool. `2` is not on the list on
 # purpose: a slate bool that is neither true nor false is a bug worth
@@ -124,7 +124,7 @@ class Field:
         if self.kind == "float":
             data = raw.to_bytes(self.width, "little")
             value = struct.unpack(FLOAT_FORMATS[self.width], data)[0]
-            return _shortest_f32(value, data) if self.width == 4 else value
+            return _shortest_f32(value, data)
         if self.kind == "int" and raw >= 1 << (8 * self.width - 1):
             return raw - (1 << (8 * self.width))
         return raw
@@ -153,7 +153,7 @@ class Field:
         if self.kind == "bool":
             return "true" if value else "false"
         if self.kind == "float":
-            return f"{value:.7g}" if self.width == 4 else f"{value:.15g}"
+            return f"{value:.7g}"
         return str(value)
 
     @property
@@ -313,6 +313,10 @@ def _field(name: str, offset: int | None, type_die: DIE | None) -> Field:
     else:
         raise ValueError(f"cannot address a {inner.tag.removeprefix('DW_TAG_')}")
 
+    if kind is not None and size == 8:
+        # No single m33 load or store covers 8 bytes, so the protocol stops
+        # at 4 rather than hand out a value that could be torn mid update.
+        raise ValueError("8 bytes is wider than one atomic access")
     if kind is None or size not in WIDTHS:
         raise ValueError(f"no {size} byte {_type_name(type_die)} on the wire")
     return Field(name, offset, size, kind, _type_name(type_die))

@@ -28,7 +28,7 @@
 template <typename SlateT>
 class SlateServer
 {
-    /* The low `n` bytes of a uint64_t are its first `n` bytes in
+    /* The low `n` bytes of a uint32_t are its first `n` bytes in
        memory only on a little endian machine, which the rp2350 is. */
     static_assert(std::endian::native == std::endian::little,
                   "value is copied as little endian bytes");
@@ -94,8 +94,7 @@ private:
         switch (width) {
         case Width_WIDTH_1_BYTE:
         case Width_WIDTH_2_BYTES:
-        case Width_WIDTH_4_BYTES:
-        case Width_WIDTH_8_BYTES: return true;
+        case Width_WIDTH_4_BYTES: return true;
         default: return false;
         }
     }

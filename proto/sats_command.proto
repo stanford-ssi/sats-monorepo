@@ -13,6 +13,12 @@ syntax = "proto3";
  * a request knows what the bytes mean (the ground reads it from the elf's
  * debug info); whoever answers it only copies bytes, so it needs no per
  * type code at all.
+ *
+ * Sizes: `type`, `width` and `status` each fit in one byte, and
+ * sats_command.options tells nanopb to store them as uint8_t. On the wire
+ * every one of them is a single byte varint already. A value tops out at
+ * 32 bits, the widest load or store the m33 makes in one instruction, so
+ * nothing the protocol reads or writes can ever be seen half updated.
  */
 
 enum SatMsgType {
@@ -26,15 +32,15 @@ enum SatMsgType {
 /*
  * Bytes addressed. Each value is its own byte count, so once a width is
  * known to be one of these it can be used as a length directly. proto3
- * enums are open, so anything else can still arrive and is refused with
- * STATUS_BAD_WIDTH.
+ * enums are open, so anything else that fits in a byte can still arrive
+ * and is refused with STATUS_BAD_WIDTH; anything that does not fit fails
+ * to decode at all.
  */
 enum Width {
   WIDTH_UNSPECIFIED = 0;
   WIDTH_1_BYTE = 1;
   WIDTH_2_BYTES = 2;
   WIDTH_4_BYTES = 4;
-  WIDTH_8_BYTES = 8;
 }
 
 enum Status {
@@ -43,22 +49,25 @@ enum Status {
   STATUS_BAD_WIDTH = 2;   // not one of the Width values
 }
 
+/*
+ * The one byte fields are numbered first: nanopb lays the struct out in tag
+ * order, so this packs them together into 12 bytes rather than 20.
+ */
 message SatMsg {
   SatMsgType type = 1;
+  Width width = 2;
+
+  /* Set on responses only. A failed request leaves memory untouched. */
+  Status status = 3;
 
   /* Byte offset into the answering node's memory. Echoed in the response,
      along with width, so a response can be matched to its request. */
-  uint32 offset = 2;
-
-  Width width = 3;
+  uint32 offset = 4;
 
   /*
    * The raw bytes, little endian, in the low `width` bytes. A WRITE carries
    * what to store; both responses carry what the memory holds afterwards,
    * so a write is confirmed rather than assumed. Unused by a READ.
    */
-  uint64 value = 4;
-
-  /* Set on responses only. A failed request leaves memory untouched. */
-  Status status = 5;
+  uint32 value = 5;
 }

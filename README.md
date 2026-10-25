@@ -135,11 +135,17 @@ membership in the `dialout` group.
 
 | field | |
 |---|---|
-| `type` | `SatMsgType`: `READ`, `WRITE`, `READ_RESPONSE` or `WRITE_RESPONSE` |
-| `offset` | byte offset into the answering node's memory |
-| `width` | `Width`: `WIDTH_1_BYTE`, `_2_BYTES`, `_4_BYTES` or `_8_BYTES`; each value is its own byte count |
-| `value` | the raw bytes, little endian, in the low `width` bytes |
-| `status` | responses only: `OK`, `BAD_ADDRESS` or `BAD_WIDTH` |
+| `type` | 1 byte. `SatMsgType`: `READ`, `WRITE`, `READ_RESPONSE` or `WRITE_RESPONSE` |
+| `width` | 1 byte. `Width`: `WIDTH_1_BYTE`, `_2_BYTES` or `_4_BYTES`; each value is its own byte count |
+| `status` | 1 byte. Responses only: `OK`, `BAD_ADDRESS` or `BAD_WIDTH` |
+| `offset` | `uint32`, byte offset into the answering node's memory |
+| `value` | `uint32`, the raw bytes, little endian, in the low `width` bytes |
+
+The three enums are stored as `uint8_t` on the c++ side
+(`proto/sats_command.options`), and nanopb refuses a frame whose value does
+not fit rather than truncating it. A value tops out at 32 bits because that
+is the widest load or store the m33 makes in one instruction, so no read can
+see a field half updated; 64 bit slate fields are listed as skipped.
 
 It is symmetric: either end of a link can send requests and either can
 answer them, so the same message works ground to flight or between two

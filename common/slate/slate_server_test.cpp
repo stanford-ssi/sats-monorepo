@@ -22,7 +22,7 @@ struct TestSlate
     uint32_t sleep_ms{};
     float temperature{};
     int8_t trim{};
-    uint64_t uptime_us{};
+    uint32_t drift{};
 };
 
 constexpr uint32_t kFlag = 0;
@@ -31,7 +31,7 @@ constexpr uint32_t kCounter = 2;
 constexpr uint32_t kSleepMs = 4;
 constexpr uint32_t kTemperature = 8;
 constexpr uint32_t kTrim = 12;
-constexpr uint32_t kUptimeUs = 16;
+constexpr uint32_t kDrift = 16;
 
 static_assert(offsetof(TestSlate, flag) == kFlag, "");
 static_assert(offsetof(TestSlate, mode) == kMode, "");
@@ -39,11 +39,11 @@ static_assert(offsetof(TestSlate, counter) == kCounter, "");
 static_assert(offsetof(TestSlate, sleep_ms) == kSleepMs, "");
 static_assert(offsetof(TestSlate, temperature) == kTemperature, "");
 static_assert(offsetof(TestSlate, trim) == kTrim, "");
-static_assert(offsetof(TestSlate, uptime_us) == kUptimeUs, "");
-static_assert(sizeof(TestSlate) == 24, "");
+static_assert(offsetof(TestSlate, drift) == kDrift, "");
+static_assert(sizeof(TestSlate) == 20, "");
 
 SatMsg request(SatMsgType type, uint32_t offset, uint32_t width,
-               uint64_t value = 0)
+               uint32_t value = 0)
 {
     SatMsg msg = SatMsg_init_zero;
     msg.type = type;
@@ -53,7 +53,7 @@ SatMsg request(SatMsgType type, uint32_t offset, uint32_t width,
     return msg;
 }
 
-SatMsg write(uint32_t offset, uint32_t width, uint64_t value)
+SatMsg write(uint32_t offset, uint32_t width, uint32_t value)
 {
     return request(SatMsgType_SAT_MSG_TYPE_WRITE, offset, width, value);
 }
@@ -126,8 +126,8 @@ TEST_F(SlateServerTest, EveryWidthTouchesExactlyItsOwnBytes)
     EXPECT_EQ(slate_.flag, 0x11);
     EXPECT_EQ(slate_.counter, 0x2222);
 
-    handle(write(kUptimeUs, 8, 0x0123456789ABCDEFull));
-    EXPECT_EQ(slate_.uptime_us, 0x0123456789ABCDEFull);
+    handle(write(kDrift, 4, 0x01234567));
+    EXPECT_EQ(slate_.drift, 0x01234567u);
     EXPECT_EQ(slate_.trim, 0x33);
 }
 
@@ -168,7 +168,9 @@ TEST_F(SlateServerTest, UnsupportedWidthsAreRejected)
 {
     const TestSlate before = slate_;
 
-    for (uint32_t width : {0u, 3u, 5u, 16u, 0xffffffffu}) {
+    /* 8 is a perfectly good memcpy, but not one the m33 makes in a single
+       store, so it is refused like any other width. */
+    for (uint32_t width : {0u, 3u, 5u, 8u, 16u, 255u}) {
         SatMsg rsp = handle(write(0, width, 0xffffffff));
         EXPECT_EQ(rsp.status, Status_STATUS_BAD_WIDTH) << "width " << width;
         EXPECT_EQ(rsp.value, 0u);
@@ -195,9 +197,9 @@ TEST_F(SlateServerTest, OffsetPastTheEndIsRejected)
 
 TEST_F(SlateServerTest, LastSlotIsStillAddressable)
 {
-    /* The bound must not be off by one: the last 8 byte slot starts at
-       size - 8 and is inside the slate. */
-    EXPECT_EQ(status_of(write(sizeof(TestSlate) - 8, 8, 1)), Status_STATUS_OK);
+    /* The bound must not be off by one: the last 4 byte slot starts at
+       size - 4 and is inside the slate. */
+    EXPECT_EQ(status_of(write(sizeof(TestSlate) - 4, 4, 1)), Status_STATUS_OK);
     EXPECT_EQ(status_of(write(sizeof(TestSlate) - 1, 1, 1)), Status_STATUS_OK);
 }
 
@@ -207,7 +209,7 @@ TEST_F(SlateServerTest, OffsetNearUint32MaxDoesNotWrap)
        bounds check; offset <= sizeof - width does not. */
     EXPECT_EQ(status_of(write(0xffffffff, 1, 1)), Status_STATUS_BAD_ADDRESS);
     EXPECT_EQ(status_of(write(0xfffffffc, 4, 1)), Status_STATUS_BAD_ADDRESS);
-    EXPECT_EQ(status_of(write(0xfffffff8, 8, 1)), Status_STATUS_BAD_ADDRESS);
+    EXPECT_EQ(status_of(write(0xfffffffe, 2, 1)), Status_STATUS_BAD_ADDRESS);
     EXPECT_EQ(status_of(read(0xffffffff, 4)), Status_STATUS_BAD_ADDRESS);
 }
 
@@ -217,7 +219,7 @@ TEST_F(SlateServerTest, MisalignedOffsetsAreRejected)
 
     EXPECT_EQ(status_of(write(1, 2, 0xabcd)), Status_STATUS_BAD_ADDRESS);
     EXPECT_EQ(status_of(write(2, 4, 0xabcd)), Status_STATUS_BAD_ADDRESS);
-    EXPECT_EQ(status_of(write(4, 8, 0xabcd)), Status_STATUS_BAD_ADDRESS);
+    EXPECT_EQ(status_of(write(6, 4, 0xabcd)), Status_STATUS_BAD_ADDRESS);
     EXPECT_EQ(status_of(read(1, 4)), Status_STATUS_BAD_ADDRESS);
 
     EXPECT_EQ(std::memcmp(&slate_, &before, sizeof(TestSlate)), 0);
@@ -252,7 +254,7 @@ TEST(SlateServerTinySlateTest, WidthLargerThanTheSlateIsRejected)
 
     EXPECT_EQ(server.handle(write(0, 4, 0xffffffff))->status,
               Status_STATUS_BAD_ADDRESS);
-    EXPECT_EQ(server.handle(read(0, 8))->status, Status_STATUS_BAD_ADDRESS);
+    EXPECT_EQ(server.handle(read(0, 2))->status, Status_STATUS_BAD_ADDRESS);
     EXPECT_EQ(slate.only, 0);
 }
 

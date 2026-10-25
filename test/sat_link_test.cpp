@@ -52,7 +52,7 @@ void send_msg(UsbSim &usb, const SatMsg &msg)
 }
 
 SatMsg make(SatMsgType type, uint32_t offset, uint32_t width,
-            uint64_t value = 0, Status status = Status_STATUS_OK)
+            uint32_t value = 0, Status status = Status_STATUS_OK)
 {
     SatMsg msg = SatMsg_init_zero;
     msg.type = type;
@@ -63,7 +63,7 @@ SatMsg make(SatMsgType type, uint32_t offset, uint32_t width,
     return msg;
 }
 
-uint64_t bits_of(float value)
+uint32_t bits_of(float value)
 {
     uint32_t bits = 0;
     std::memcpy(&bits, &value, sizeof(bits));
@@ -116,7 +116,7 @@ TEST_F(SatLinkTest, DecodesEveryType)
         make(SatMsgType_SAT_MSG_TYPE_READ, 8, 4),
         make(SatMsgType_SAT_MSG_TYPE_WRITE, 12, 4, 0xDEADBEEF),
         make(SatMsgType_SAT_MSG_TYPE_READ_RESPONSE, 16, 2, 0xBEEF),
-        make(SatMsgType_SAT_MSG_TYPE_WRITE_RESPONSE, 20, 8, 0,
+        make(SatMsgType_SAT_MSG_TYPE_WRITE_RESPONSE, 20, 4, 0,
              Status_STATUS_BAD_ADDRESS),
     };
     for (const SatMsg &msg : sent) {
@@ -131,13 +131,12 @@ TEST_F(SatLinkTest, DecodesEveryType)
     }
 }
 
-TEST_F(SatLinkTest, CarriesAll64BitsOfValue)
+TEST_F(SatLinkTest, CarriesAll32BitsOfValue)
 {
-    send_msg(in_,
-             make(SatMsgType_SAT_MSG_TYPE_WRITE, 0, 8, 0xFEDCBA9876543210ull));
+    send_msg(in_, make(SatMsgType_SAT_MSG_TYPE_WRITE, 0, 4, 0xFEDCBA98));
 
     ASSERT_EQ(link_.update(), 1u);
-    EXPECT_EQ(link_.receive()->value, 0xFEDCBA9876543210ull);
+    EXPECT_EQ(link_.receive()->value, 0xFEDCBA98u);
 }
 
 TEST_F(SatLinkTest, WaitsForTheDelimiterAcrossUpdates)
@@ -177,10 +176,10 @@ TEST_F(SatLinkTest, RestoresTheZeroBytesInsideAValue)
 
 TEST_F(SatLinkTest, RestoresAnExplicitZeroField)
 {
-    /* type = WRITE, offset = 42, width = 1, value = 0, with the zero value
+    /* type = WRITE, width = 1, offset = 42, value = 0, with the zero value
        spelled out as an explicit varint rather than omitted the way proto3
        would, so that the payload actually carries a zero byte for cobs. */
-    send_frame(in_, {0x08, 0x02, 0x10, 0x2A, 0x18, 0x01, 0x20, 0x00});
+    send_frame(in_, {0x08, 0x02, 0x10, 0x01, 0x20, 0x2A, 0x28, 0x00});
 
     ASSERT_EQ(link_.update(), 1u);
     expect_same(*link_.receive(),
@@ -206,6 +205,18 @@ TEST_F(SatLinkTest, DropsUndecodableFrameAndResyncs)
 
     EXPECT_EQ(link_.update(), 1u);
     expect_same(*link_.receive(), make(SatMsgType_SAT_MSG_TYPE_WRITE, 8, 4, 9));
+}
+
+TEST_F(SatLinkTest, DropsAWidthThatDoesNotFitInAByte)
+{
+    /* width = 260, which a one byte field would truncate to 4: a valid
+       width, at an offset the sender never meant. nanopb must refuse the
+       frame outright instead. */
+    send_frame(in_, {0x08, 0x01, 0x10, 0x84, 0x02, 0x20, 0x00});
+    send_msg(in_, make(SatMsgType_SAT_MSG_TYPE_READ, 4, 4));
+
+    EXPECT_EQ(link_.update(), 1u);
+    expect_same(*link_.receive(), make(SatMsgType_SAT_MSG_TYPE_READ, 4, 4));
 }
 
 TEST_F(SatLinkTest, DropsOversizedFrameAndResyncs)

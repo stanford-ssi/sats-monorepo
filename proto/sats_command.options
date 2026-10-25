@@ -1,0 +1,9 @@
+# nanopb storage sizes for sats_command.proto. Kept out of the .proto so it
+# compiles with plain protoc for the ground tooling too.
+#
+# Every one of these enums fits in a byte, so store it in one. nanopb then
+# refuses to decode a frame whose value does not fit, rather than truncating
+# it: a width of 260 must not quietly become 4.
+SatMsgType enum_intsize:IS_8
+Width      enum_intsize:IS_8
+Status     enum_intsize:IS_8
