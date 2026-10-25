@@ -1,2 +1,3 @@
 # Sim output
 *.json
+/data/

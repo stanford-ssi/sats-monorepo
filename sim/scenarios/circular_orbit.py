@@ -43,7 +43,27 @@ def test_circular_orbit() -> None:
     scenario = make_scenario()
     result = run(replace(scenario, duration_s=600.0))
 
-    radius_m = np.linalg.norm(result["position_eci_m"], axis=1)
-    quaternion_norm = np.linalg.norm(result["quat_eci_to_body"], axis=1)
+    radius_m = np.linalg.norm(result["state/position_eci_m"], axis=1)
+    quaternion_norm = np.linalg.norm(result["state/quat_eci_to_body"], axis=1)
     assert np.ptp(radius_m) < 0.1
     np.testing.assert_allclose(quaternion_norm, 1.0, atol=1e-12)
+
+    expected_channels = {
+        "state/position_eci_m",
+        "state/velocity_eci_m_per_s",
+        "state/quat_eci_to_body",
+        "state/angular_velocity_body_wrt_eci_eci_rad_per_s",
+        "physics/dynamics/gravity/gravity_force_moment/force_eci_n",
+        "physics/dynamics/gravity/gravity_force_moment/moment_body_nm",
+        "physics/rigid_body/derivative/velocity_eci_m_per_s2",
+    }
+    assert expected_channels <= result.channels.keys()
+    np.testing.assert_allclose(
+        result["physics/dynamics/gravity/gravity_force_moment/force_eci_n"],
+        result["physics/rigid_body/derivative/velocity_eci_m_per_s2"]
+        * scenario.satellite.mass_kg,
+    )
+    assert all(
+        not any(segment.startswith("_") for segment in path.split("/"))
+        for path in result.channels
+    )

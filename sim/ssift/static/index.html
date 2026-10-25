@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SSIFT</title>
+    <script>
+      const initialTheme =
+        localStorage.getItem("ssift-theme") ||
+        (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+      document.documentElement.dataset.theme = initialTheme;
+      document.documentElement.classList.add(`theme-${initialTheme}`);
+    </script>
+    <link rel="stylesheet" href="/style.css?v=5" />
+    <script src="/plotly.min.js"></script>
+    <script type="module" src="/app.js?v=4"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-logo" src="/ssi-dark.png" alt="" aria-hidden="true" />
+        <div>
+          <strong>SSIFT</strong>
+          <span id="run-name">Loading run…</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="local-badge">Local data</span>
+        <button id="theme-toggle" class="button" type="button">Light</button>
+        <label class="button">
+          Open run
+          <input id="file-input" type="file" accept="application/json,.json" />
+        </label>
+        <button id="reset-layout" class="button" type="button">Reset layout</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside id="sources-sidebar" class="sidebar">
+        <div class="sidebar-heading">
+          <div>
+            <span class="eyebrow">Sources</span>
+            <h1>Channels</h1>
+          </div>
+          <span id="channel-count" class="count"></span>
+        </div>
+        <label class="search">
+          <span aria-hidden="true">⌕</span>
+          <input id="channel-search" type="search" placeholder="Filter telemetry" />
+        </label>
+        <p class="hint">Select a panel, then click a channel to toggle it—or drag it.</p>
+        <nav id="source-tree" class="source-tree" aria-label="Telemetry channels"></nav>
+      </aside>
+
+      <div
+        id="sidebar-resizer"
+        class="sidebar-resizer"
+        role="separator"
+        aria-label="Resize sources sidebar"
+        aria-controls="sources-sidebar"
+        aria-orientation="vertical"
+        aria-valuemin="220"
+        aria-valuemax="560"
+        aria-valuenow="300"
+        title="Drag to resize · Double-click to reset"
+        tabindex="0"
+      ></div>
+
+      <section class="content">
+        <div class="content-toolbar">
+          <div class="panel-actions">
+            <button id="add-time-series" class="button" type="button">
+              + Time series
+            </button>
+            <button id="add-scatter" class="button" type="button">
+              + XY scatter
+            </button>
+          </div>
+        </div>
+        <div id="panels" class="panels"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

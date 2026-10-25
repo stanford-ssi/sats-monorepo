@@ -36,7 +36,7 @@ arda = { workspace = true }
 members = ["sim"]
 
 [tool.pytest.ini_options]
-testpaths = ["scripts/tests", "sim/arda", "sim/scenarios"]
+testpaths = ["scripts/tests", "sim/arda", "sim/scenarios", "sim/ssift"]
 python_files = ["*.py"]
 
 [tool.ruff]

@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from arda.common.integrators import rk4_step
 from arda.physics.rigid_body import derivative
-from arda.telemetry import Telemetry
+from arda.telemetry import Telemetry, capture_returns
 from arda.types import FloatArray, Scenario, State
 
 
@@ -32,4 +32,11 @@ def run(scenario: Scenario, *, progress: bool = False) -> Telemetry:
             state_derivative, time, states[index], scenario.step_s
         )
         states[index + 1, 6:10] /= np.linalg.norm(states[index + 1, 6:10])
-    return Telemetry.from_state_history(time_s, states)
+
+    samples = []
+    for time, state_array in zip(time_s, states, strict=True):
+        state = State.from_array(state_array)
+        with capture_returns() as model_outputs:
+            derivative(time, state, scenario.satellite)
+        samples.append({"state": state, **model_outputs})
+    return Telemetry.from_samples(time_s, samples)
