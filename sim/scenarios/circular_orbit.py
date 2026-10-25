@@ -55,12 +55,12 @@ def test_circular_orbit() -> None:
         "state/angular_velocity_body_wrt_eci_eci_rad_per_s",
         "physics/dynamics/gravity/gravity_force_moment/force_eci_n",
         "physics/dynamics/gravity/gravity_force_moment/moment_body_nm",
-        "physics/rigid_body/derivative/velocity_eci_m_per_s2",
+        "physics/rigid_body/derivative/acceleration_eci_m_per_s2",
     }
     assert expected_channels <= result.channels.keys()
     np.testing.assert_allclose(
         result["physics/dynamics/gravity/gravity_force_moment/force_eci_n"],
-        result["physics/rigid_body/derivative/velocity_eci_m_per_s2"]
+        result["physics/rigid_body/derivative/acceleration_eci_m_per_s2"]
         * scenario.satellite.mass_kg,
     )
     assert all(
