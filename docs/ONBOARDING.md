@@ -223,6 +223,8 @@ tentative steps:
 
 # Part 1: Bazel, Building & Project Structure
 
+First, clone `https://github.com/megargayu/ssi-onboarding-26.git` into a directory so you can start trying to build.
+
 Look around the `sats-monorepo` repository, and look for `BUILD.bazel` or any `*.bazel` files. Try to understand them - reading through can be really helpful.
 
 In general:
