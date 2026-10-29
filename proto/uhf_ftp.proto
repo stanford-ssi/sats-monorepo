@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+/**
+ * FTP: write-only file upload to the satellite's filesystem
+ * 
+ * Files are named by two bytes and sent in cycles of up to 256 packets; the
+ * satellite reports which packets of a cycle arrived and checks the whole
+ * file's CRC32 at the end. See https://github.com/stanford-ssi/samwise-flight-software/blob/main/src/tasks/ftp/README.md
+ *
+ * Changelog from SAMWISE: (a) file_len u16 -> u32 (b) new codes given to FTP_RESULT_REMOVE_SUCCESS and FTP_RESULT_REMOVE_ERROR
+ */
+
+package sats.uhf;
+
+// ===== UPLINK =====
+/* Wipe and reformat the filesystem. Destructive. */
+message FtpReformat {}
+
+/* Begin uploading a file. Answered with FTP_RESULT_READY_RECEIVE. */
+message FtpStartFileWrite {
+  uint32 fname = 1; // spec: u16
+  uint32 file_len = 2; // spec: u16, but should keep as u32 since 256 cycles * 256 packets * 205 bytes
+  fixed32 file_crc = 3; // CRC32 of the whole file
+}
+
+/* One packet of file data. Must fall inside the current cycle's range. */
+message FtpWriteToFile {
+  uint32 fname = 1; // spec: u16
+  uint32 packet_id = 2; // spec: u16
+  bytes data = 3; // spec: up to 205 bytes
+}
+
+message FtpCancelFileWrite {
+  uint32 fname = 1; // spec: u16
+}
+
+message FtpRemoveFile {
+  uint32 fname = 1; // spec: u16;
+}
+
+message FtpCommand {
+  oneof command {
+    FtpStartFileWrite start_file_write = 1;
+    FtpWriteToFile write_to_file = 2;
+    FtpCancelFileWrite cancel_file_write = 3;
+    FtpReformat reformat = 4;
+    FtpRemoveFile remove_file = 5;
+  }
+}
+
+// ===== DOWNLINK =====
+/* Result codes, numbered as in the FTP README so they match flight software. */
+enum FtpResult {
+  FTP_RESULT_UNSPECIFIED = 0;
+  FTP_RESULT_REFORMAT_SUCCESS = 1;
+  FTP_RESULT_READY_RECEIVE = 10;
+  FTP_RESULT_FILE_WRITE_SUCCESS = 11; // cycle complete, next range follows
+  FTP_RESULT_EOF_SUCCESS = 20; // whole file received, CRC matches
+  FTP_RESULT_CANCEL_SUCCESS = 30;
+  FTP_RESULT_STATUS_REPORT = 40; // periodic, every 5 s during a transfer
+  FTP_RESULT_REMOVE_SUCCESS = 60; // INFERRED: named in the README but given no value
+  FTP_RESULT_REFORMAT_ERROR = -1;
+  FTP_RESULT_FILESYS_INIT_ERROR = -2;
+  FTP_RESULT_FILE_WRITE_BUFFER_ERROR = -11;
+  FTP_RESULT_FILE_WRITE_MRAM_ERROR = -12;
+  FTP_RESULT_PACKET_OUT_OF_RANGE = -13;
+  FTP_RESULT_EOF_CRC_ERROR = -20;
+  FTP_RESULT_CANCEL_ERROR = -30;
+  FTP_RESULT_START_FILE_WRITE_ERROR = -50;
+  FTP_RESULT_ALREADY_WRITING_FILE = -51;
+  FTP_RESULT_NOT_WRITING_FILE = -52;
+  FTP_RESULT_REMOVE_ERROR = -60; // INFERRED: named in the README but given no value
+  FTP_RESULT_ERROR = -99;
+}
+
+/* Packet range of the next cycle and what has arrived so far. Sent with
+   READY_RECEIVE (INFERRED), FILE_WRITE_SUCCESS and PACKET_OUT_OF_RANGE. */
+message FtpCycleStatus {
+  uint32 packet_start = 1; // spec: u16, inclusive
+  uint32 packet_end = 2; // spec: u16, inclusive
+  bytes received_bitfield = 3; // spec: 32 bytes, bit set = packet received
+}
+
+/* Sent with STATUS_REPORT. Fields follow the README's FTP_STATUS_REPORT_DATA
+   struct, which differs slightly from its prose description. */
+message FtpStatusReport {
+  uint32 packet_start = 1; // spec: u16, inclusive
+  uint32 packet_end = 2; // spec: u16, inclusive
+  bytes received_bitfield = 3; // spec: 32 bytes
+  fixed32 file_crc_so_far = 4; // 0 before the first cycle is written
+  uint32 total_bytes_written = 5;
+  bool filesys_buffer_malloced = 6;
+  bool filesys_is_writing_file = 7;
+}
+
+/* Sent with EOF_SUCCESS and EOF_CRC_ERROR; both values are computed on disk. */
+message FtpEof {
+  fixed32 computed_crc = 1;
+  uint32 file_len = 2;
+}
+
+/* Sent when a filesystem or LittleFS call caused the failure. */
+message FtpFilesysError {
+  sint32 filesys_error = 1;
+  sint32 lfs_error = 2; // LFS_ERR_OK if the error came only from Filesys
+  sint32 blocks_left = 3; // only for START_FILE_WRITE_ERROR, -1 if not computed
+}
+
+message FtpResponse {
+  /* The transfer in progress, as given at start (not computed). With no
+     transfer running: fname is "XX" as two ASCII bytes, the rest 0. */
+  uint32 fname = 1; // spec: u16
+  uint32 file_len = 2;
+  fixed32 file_crc = 3;
+  FtpResult result = 4;
+  oneof detail {
+    FtpCycleStatus cycle_status = 5;
+    FtpStatusReport status_report = 6;
+    FtpEof eof = 7;
+    FtpFilesysError filesys_error = 8;
+  }
+}
