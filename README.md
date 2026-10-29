@@ -1,4 +1,4 @@
-# SSI Sats Monorepo
+# SSI Sats Monorepo. 
 
 Flight software, ground tooling and sims for SSI's cubesat, in one Bazel
 workspace. The firmware targets an RP2350 (pico 2).
