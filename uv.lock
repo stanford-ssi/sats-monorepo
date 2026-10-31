@@ -438,6 +438,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio-tools" },
+    { name = "numpy" },
+    { name = "plotly" },
     { name = "protobuf" },
     { name = "pyelftools" },
     { name = "pyserial" },
@@ -455,6 +457,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "grpcio-tools", specifier = ">=1.83.1" },
+    { name = "numpy", specifier = ">=2.5.4" },
+    { name = "plotly", specifier = ">=7.1.0" },
     { name = "protobuf", specifier = ">=7.36.1" },
     { name = "pyelftools", specifier = ">=0.33" },
     { name = "pyserial", specifier = ">=3.5" },
