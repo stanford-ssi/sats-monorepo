@@ -67,7 +67,7 @@ class Quaternion:
 # Calculations done via formulae in Markley
 def test_axis_angle_rotation_is_passive() -> None:
     # active rotation is 90degrees around z-axis
-    # passive rotation is -90 degrees around z-axis, 
+    # passive rotation is -90 degrees around z-axis,
     # quaternion will be [0 0 sin(-pi/4) cos(pi/4)]
     frame1_to_frame2 = Quaternion.from_axis_angle(
         np.array([0.0, 0.0, 1.0]), np.pi / 2.0
