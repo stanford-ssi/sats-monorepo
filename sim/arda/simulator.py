@@ -38,5 +38,9 @@ def run(scenario: Scenario, *, progress: bool = False) -> Telemetry:
         state = State.from_array(state_array)
         with capture_returns() as model_outputs:
             derivative(time, state, scenario.satellite)
-        samples.append({"state": state, **model_outputs})
+        observations = {
+            observer.name: observer.measure(time, state)
+            for observer in scenario.observers
+        }
+        samples.append({"state": state, "observers": observations, **model_outputs})
     return Telemetry.from_samples(time_s, samples)

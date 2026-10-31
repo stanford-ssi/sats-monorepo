@@ -1,6 +1,7 @@
 """Shared simulator data types."""
 
 from dataclasses import dataclass
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -75,3 +76,11 @@ class Scenario:
     initial_state: State
     duration_s: float
     step_s: float
+    observers: tuple["Observer", ...] = ()
+
+
+class Observer(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    def measure(self, time_s: float, state: State) -> object: ...
