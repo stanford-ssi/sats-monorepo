@@ -30,11 +30,11 @@ def atm_density_drag_torque(
 
     Inputs
     altitude_km          (geodetic)
-    velocity_m_per_s     (relative to atmosphere, ECEF best appoximation)  
-    
+    velocity_m_per_s     (relative to atmosphere, ECEF best appoximation)
+
     TODO: Model atmosphere's ECEF velocity (based on latitude and altitude) to offset satellite velocity.
-    This will convert the satellite's ECEF velocity to its velocity relative to the atmosphere for the drag             calculation.  
-    
+    This will convert the satellite's ECEF velocity to its velocity relative to the atmosphere for the drag             calculation.
+
     ram_area_m2
     center_of_pressure_m (3d vector, spacecraft frame)
     center_of_mass_m     (3d vector, spacecraft frame)
