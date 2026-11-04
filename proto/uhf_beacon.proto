@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+/**
+ * Beacon holds critical information only.
+ * Other information should be passed as logs over FTP.
+ */
+
+package sats.uhf;
+
+message Beacon {
+  string callsign = 1; // amateur-band identification
+  uint64 sat_time_ms = 2;
+  fixed32 slate_crc = 3; // check for changes to slate
+  uint32 state = 4; // state machine ID
+  uint32 fault_flags = 5; // bitfield for fire alarms
+  uint32 last_reset_reason = 6;
+  uint32 last_request_id = 7; // in case we lose the Response packet
+  uint32 requests_rejected = 8; // uplinks dropped by the HMAC or replay check, this boot
+  Power power = 9;
+}
+
+message Power {
+  uint32 battery_mv = 1; // battery voltage, the charge level
+  sint32 battery_ma = 2; // positive charging, negative discharging
+  sint32 battery_temp_dc = 3; // tenths of a degree Celsius
+}
