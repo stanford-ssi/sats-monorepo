@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 theme.py - colours and box glyphs, with a plain variant.
 

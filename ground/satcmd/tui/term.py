@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 term.py - a bottom anchored terminal driver.
 
@@ -19,7 +18,7 @@ import sys
 import termios
 import tty
 
-from theme import ANSI, visible_len
+from satcmd.tui.theme import ANSI, visible_len
 
 HIDE_CURSOR = "\x1b[?25l"
 SHOW_CURSOR = "\x1b[?25h"

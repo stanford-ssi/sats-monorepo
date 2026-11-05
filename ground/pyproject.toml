@@ -1,0 +1,21 @@
+[project]
+name = "satcmd"
+version = "0.1.0"
+description = "Ground side of the SatCmd protocol: talk to a board's slate by name"
+requires-python = ">=3.13"
+dependencies = [
+    "grpcio-tools>=1.83.1",
+    "protobuf>=7.36.1",
+    "pyelftools>=0.33",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+satcmd = "satcmd.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""

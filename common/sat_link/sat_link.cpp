@@ -1,26 +1,32 @@
 /**
  * Author: Carson Lauer
- * Date: 8 September 2026
+ * Date: 25 October 2026
  */
-#include "cmd_receiver.hpp"
+#include "sat_link.hpp"
 
 #include "stdint.h"
+
+#include <array>
+
+#include "common/cobs/cobs.hpp"
 #include "common/util/queue.hpp"
 
 #include "pb_decode.h"
+#include "pb_encode.h"
 #include "proto/sats_command.pb.h"
 
-CmdReceiver::CmdReceiver(Queue<uint8_t> &in) : in_(in) {}
+SatLink::SatLink(Queue<uint8_t> &in, Queue<uint8_t> &out) : in_(in), out_(out)
+{}
 
-uint32_t CmdReceiver::update()
+uint32_t SatLink::update()
 {
-    uint32_t cmds = 0;
+    uint32_t msgs = 0;
     uint8_t c{};
     while (in_.pop(c)) {
         /* Zero never appears inside an encoded frame, so it delimits one. */
         if (c == 0) {
             if (finish_frame()) {
-                cmds++;
+                msgs++;
             }
             continue;
         }
@@ -38,16 +44,61 @@ uint32_t CmdReceiver::update()
             overflowed_ = true;
         }
     }
-    return cmds;
+    return msgs;
 }
 
-std::optional<SatCmd> CmdReceiver::get_cmd()
+std::optional<SatMsg> SatLink::receive()
 {
-    SatCmd cmd = SatCmd_init_zero;
-    if (!cmd_buffer_.pop(cmd)) {
+    SatMsg msg = SatMsg_init_zero;
+    if (!inbox_.pop(msg)) {
         return {};
     }
-    return cmd;
+    return msg;
+}
+
+bool SatLink::send(const SatMsg &msg)
+{
+    std::array<uint8_t, SatMsg_size> payload{};
+    pb_ostream_t stream =
+        pb_ostream_from_buffer(payload.data(), payload.size());
+    if (!pb_encode(&stream, &SatMsg_msg, &msg)) {
+        return false;
+    }
+
+    /* Every real message has a non zero kind, so it never encodes to
+       nothing. One that did would frame as a lone delimiter, which the far
+       end throws away as a stray, so refuse it here instead. */
+    if (stream.bytes_written == 0) {
+        return false;
+    }
+
+    std::array<uint8_t, kMaxEncodedSize> frame{};
+    const uint32_t n =
+        cobs_encode(payload.data(), stream.bytes_written, frame.data());
+
+    /* A frame cut short by a full queue never got its delimiter, so it would
+       run into the next frame and take that one down with it. Close it off
+       here and the far end drops just the fragment, as an empty or
+       undecodable frame, then resyncs on the frame we are about to write. */
+    if (torn_) {
+        if (!out_.push(0)) {
+            return false;
+        }
+        torn_ = false;
+    }
+
+    for (uint32_t i = 0; i < n; i++) {
+        if (!out_.push(frame[i])) {
+            torn_ = true;
+            return false;
+        }
+    }
+
+    if (!out_.push(0)) {
+        torn_ = true;
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -60,7 +111,7 @@ std::optional<SatCmd> CmdReceiver::get_cmd()
  * Returns the decoded byte, or nothing when `next` was a code byte that did
  * not stand in for a zero.
  */
-std::optional<uint8_t> CmdReceiver::decode_c(uint8_t next)
+std::optional<uint8_t> SatLink::decode_c(uint8_t next)
 {
     if (pos_ < code_) {
         pos_++;
@@ -76,9 +127,9 @@ std::optional<uint8_t> CmdReceiver::decode_c(uint8_t next)
 
 /**
  * Hand the reassembled frame to nanopb and reset for the next one. Returns
- * true if a command was queued up.
+ * true if a message was queued up.
  */
-bool CmdReceiver::finish_frame()
+bool SatLink::finish_frame()
 {
     const std::size_t len = len_;
     const bool usable = !overflowed_;
@@ -93,11 +144,11 @@ bool CmdReceiver::finish_frame()
         return false;
     }
 
-    SatCmd cmd = SatCmd_init_zero;
+    SatMsg msg = SatMsg_init_zero;
     pb_istream_t stream = pb_istream_from_buffer(buf_.data(), len);
-    if (!pb_decode(&stream, &SatCmd_msg, &cmd)) {
+    if (!pb_decode(&stream, &SatMsg_msg, &msg)) {
         return false;
     }
 
-    return cmd_buffer_.push(cmd);
+    return inbox_.push(msg);
 }

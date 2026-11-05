@@ -11,26 +11,12 @@ cc_test(
 )
 
 cc_test(
-    name = "cmd_receiver_test",
+    name = "sat_link_test",
     size = "small",
-    srcs = ["cmd_receiver_test.cpp"],
+    srcs = ["sat_link_test.cpp"],
     deps = [
-        "//common/cmd_receiver",
         "//common/cobs",
-        "//common/util",
-        "//proto:sats_command_nanopb",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "cmd_responder_test",
-    size = "small",
-    srcs = ["cmd_responder_test.cpp"],
-    deps = [
-        "//common/cmd_responder",
-        "//common/cobs",
+        "//common/sat_link",
         "//common/util",
         "//proto:sats_command_nanopb",
         "@googletest//:gtest",

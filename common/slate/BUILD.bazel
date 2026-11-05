@@ -2,16 +2,16 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "slate",
-    hdrs = ["slate_writer.hpp"],
+    hdrs = ["slate_server.hpp"],
     deps = [
         "//proto:sats_command_nanopb",
     ],
 )
 
 cc_test(
-    name = "slate_writer_test",
+    name = "slate_server_test",
     size = "small",
-    srcs = ["slate_writer_test.cpp"],
+    srcs = ["slate_server_test.cpp"],
     deps = [
         ":slate",
         "@googletest//:gtest",
