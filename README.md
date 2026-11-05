@@ -7,8 +7,8 @@ the PiCubed flight board.
 ## How to build an app
 
 ```bash
-bazel build --config=pico //:blink     # Raspberry Pi Pico 2
-bazel build --config=picubed //:blink  # PiCubed
+bazelisk build --config=pico //:blink     # Raspberry Pi Pico 2
+bazelisk build --config=picubed //:blink  # PiCubed
 ```
 
 Every build is for a board. Each board is a bazel platform in
@@ -123,16 +123,16 @@ offset comes back as `BAD_OFFSET` rather than corrupting memory.
 ## How to run the tests
 
 ``` bash
-bazel test //...     # firmware and host c++
+bazelisk test //...  # firmware and host c++
 uv run pytest        # ground tooling
 ```
 
 ## Formatting
 
 ``` bash
-bazel run //:format            # rewrite c++ with clang-format, python with ruff
-bazel run //:format -- --check # verify only, what CI runs
-uv run pre-commit install      # install the repository's git commit hooks
+bazelisk run //:format            # rewrite c++ with clang-format, python with ruff
+bazelisk run //:format -- --check # verify only, what CI runs
+uv run pre-commit install         # install the repository's git commit hooks
 ```
 
 Only tracked files are formatted, so `git add` a new file before expecting
@@ -145,9 +145,9 @@ commit stops so you can review and stage the fixes before committing again.
 ## Run the CI checks locally
 
 ``` bash
-bazel test //... --test_output=errors
-bazel build --config=pico //:blink
-bazel build --config=picubed //:blink
+bazelisk test //... --test_output=errors
+bazelisk build --config=pico //:blink
+bazelisk build --config=picubed //:blink
 ```
 
 ## Other scripts

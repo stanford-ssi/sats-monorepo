@@ -16,7 +16,7 @@ load("//platforms/boards:defs.bzl", "REQUIRES_BOARD")
 # Formatting
 # ============================================================================
 
-# `bazel run //:format` to rewrite, `-- --check` to verify.
+# `bazelisk run //:format` to rewrite, `-- --check` to verify.
 sh_binary(
     name = "format",
     srcs = ["tools/format.sh"],
