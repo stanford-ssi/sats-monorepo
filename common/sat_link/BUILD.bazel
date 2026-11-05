@@ -3,7 +3,6 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "sat_link",
     hdrs = ["sat_link.hpp"],
-    srcs = ["sat_link.cpp"],
     deps = [
         "//common/cobs",
         "//common/util",

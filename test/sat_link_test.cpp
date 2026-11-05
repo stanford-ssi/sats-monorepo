@@ -22,6 +22,7 @@ namespace
 {
 
 using UsbSim = RingBuffer<uint8_t, 1024>;
+using Link = SatLink<SatMsg, SatMsg>;
 
 /* Cobs encode `payload` and push it, plus its delimiter, onto the link. */
 void send_frame(UsbSim &usb, const std::vector<uint8_t> &payload)
@@ -84,7 +85,7 @@ class SatLinkTest : public ::testing::Test
 protected:
     UsbSim in_{};
     UsbSim out_{};
-    SatLink link_{in_, out_};
+    Link link_{in_, out_};
 };
 
 /* -- receiving ----------------------------------------------------------- */
@@ -265,7 +266,7 @@ TEST_F(SatLinkTest, ReportsAFullQueueAndCleansUpTheTornFrame)
     /* Only room for one of these frames plus change, so the second send
        runs out of space partway through and leaves a fragment behind. */
     RingBuffer<uint8_t, 16> tiny{};
-    SatLink link{in_, tiny};
+    Link link{in_, tiny};
 
     const SatMsg rsp = make(SatMsgType_SAT_MSG_TYPE_READ_RESPONSE, 8, 4, 42);
     ASSERT_TRUE(link.send(rsp));
@@ -282,7 +283,7 @@ TEST_F(SatLinkTest, ReportsAFullQueueAndCleansUpTheTornFrame)
     ASSERT_TRUE(tiny.pop(c));
     EXPECT_EQ(c, 0);
 
-    SatLink far{tiny, out_};
+    Link far{tiny, out_};
     ASSERT_EQ(far.update(), 1u);
     expect_same(*far.receive(), rsp);
 }
@@ -295,8 +296,8 @@ TEST(SatLinkPairTest, TwoLinksTalkToEachOther)
        Either can ask, and either can answer. */
     UsbSim a_to_b{};
     UsbSim b_to_a{};
-    SatLink a{b_to_a, a_to_b};
-    SatLink b{a_to_b, b_to_a};
+    Link a{b_to_a, a_to_b};
+    Link b{a_to_b, b_to_a};
 
     ASSERT_TRUE(a.send(make(SatMsgType_SAT_MSG_TYPE_READ, 4, 4)));
     ASSERT_TRUE(b.send(make(SatMsgType_SAT_MSG_TYPE_WRITE, 0, 1, 7)));

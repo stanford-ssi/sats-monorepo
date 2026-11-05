@@ -34,7 +34,7 @@ int main()
     led_gpio.set_function(GpioFunction::Output);
 
     UsbQueue q{};
-    SatLink link{q, q};
+    SatLink<SatMsg, SatMsg> link{q, q};
     SlateServer<Slate> server{gSlate};
 
     Interval blink{};

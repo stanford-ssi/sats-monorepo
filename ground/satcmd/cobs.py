@@ -4,7 +4,7 @@ cobs.py - the wire framing shared with the firmware.
 Frames are cobs encoded and delimited by a zero byte, so a zero can never
 appear inside a frame and a receiver can always resynchronise on one. This
 is a direct port of common/cobs/cobs.cpp and the streaming decoder in
-common/sat_link/sat_link.cpp; keep the three in step.
+common/sat_link/sat_link.hpp; keep the three in step.
 """
 
 DELIMITER = b"\x00"
