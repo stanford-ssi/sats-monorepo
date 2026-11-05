@@ -1,0 +1,50 @@
+"""
+Board platforms.
+
+Each board inherits its chip platform through `parents` and adds its own
+constraint and flags. Firmware is built for a board, never a bare chip; see
+REQUIRES_BOARD in defs.bzl. Every board needs a matching `build:<board>`
+config in .bazelrc.
+"""
+
+package(default_visibility = ["//visibility:public"])
+
+constraint_setting(
+    name = "board",
+    default_constraint_value = ":none",
+)
+
+# Set on every platform that isn't a board, including the chip platforms.
+constraint_value(
+    name = "none",
+    constraint_setting = ":board",
+)
+
+# Raspberry Pi Pico 2 dev board.
+constraint_value(
+    name = "pico_board",
+    constraint_setting = ":board",
+)
+
+platform(
+    name = "pico",
+    constraint_values = [":pico_board"],
+    flags = ["--@pico-sdk//bazel/config:PICO_BOARD=pico2"],
+    parents = ["//platforms/chips:rp2350"],
+)
+
+# PiCubed flight board.
+constraint_value(
+    name = "picubed_board",
+    constraint_setting = ":board",
+)
+
+platform(
+    name = "picubed",
+    constraint_values = [":picubed_board"],
+    # TODO: the PiCubed is an RP2350B (48 gpios); it needs its own board
+    # header (via PICO_CONFIG_HEADER) before it is flashed. Until then it
+    # borrows the Pico 2's.
+    flags = ["--@pico-sdk//bazel/config:PICO_BOARD=pico2"],
+    parents = ["//platforms/chips:rp2350"],
+)

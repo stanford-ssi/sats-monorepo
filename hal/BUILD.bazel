@@ -15,7 +15,7 @@ cc_library(
     ],
     strip_include_prefix = "/hal/include",
     include_prefix = "hal",
-    target_compatible_with = ["//platforms:arm_cortex_m33"],
+    target_compatible_with = ["//platforms/chips:rp2350_chip"],
 )
 
 cc_library(
@@ -26,5 +26,5 @@ cc_library(
         "@pico-sdk//src/rp2_common/pico_stdlib",
         "@pico-sdk//src/rp2_common/pico_stdio_usb",
     ],
-    target_compatible_with = ["//platforms:arm_cortex_m33"],
+    target_compatible_with = ["//platforms/chips:rp2350_chip"],
 )

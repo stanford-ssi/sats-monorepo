@@ -229,8 +229,8 @@ In general:
 
 - `bazel` is a build system that allows you to automatically link and compile files easily, similar to `cmake` (but MUCH better!)
 - Features of `bazel`: tests, caching (so we don't have to compile everything every time), `genrule`s (to get into later), and much more
-- `.bazelrc` is where we configure `bazel`, including the different build profiles.
-  - We will focus on `pico`, which is what we are playing with, but `picubed-flight` is the final version that will go onto our satellite!
+- `.bazelrc` is where we configure `bazel`, including the different build profiles. Each profile picks a board platform from `platforms/boards/`, which builds on a chip platform from `platforms/chips/`.
+  - We will focus on `pico`, which is what we are playing with, but `picubed` is the final version that will go onto our satellite!
   - We also link `pico-sdk` here, which allows us to use the library with the pico/raspi/etc.
 - `BUILD.bazel` specifies _targets_, i.e. a component that needs to be compiled, along with its _dependencies_, which are the subcomponents it requires to function.
   - The root `BUILD.bazel` is our actual binary, and depends on essentially all code in the repository (of course!)

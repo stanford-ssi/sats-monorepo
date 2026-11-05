@@ -10,6 +10,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("//platforms/boards:defs.bzl", "REQUIRES_BOARD")
 
 # ============================================================================
 # Formatting
@@ -57,5 +58,6 @@ cc_binary(
         "-Wdouble-promotion",
         "-DCFG_TUD_CDC=2",
     ],
+    target_compatible_with = REQUIRES_BOARD,
     deps = [":blink_lib"],
 )
