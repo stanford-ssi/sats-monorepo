@@ -4,25 +4,18 @@ syntax = "proto3";
  * Commands: actions that should not be expressed as memory writes.
  *
  * Commands answer with a result code only, sent before the action takes
- * effect. An unknown opcode, or no variant this firmware knows, is answered
- * with RESULT_CODE_UNSUPPORTED.
+ * effect. A variant this firmware does not know is answered with
+ * RESULT_CODE_UNSUPPORTED.
  */
 
 package sats.uhf;
 
 message Command {
   oneof cmd {
-    BuildCommand build = 1;
-    Reboot reboot = 2;
-    TransmitOff transmit_off = 3;
-    TransmitOn transmit_on = 4;
+    Reboot reboot = 1;
+    TransmitOff transmit_off = 2;
+    TransmitOn transmit_on = 3;
   }
-}
-
-/* A custom command defined by the firmware build and listed in its command dictionary. */
-message BuildCommand {
-  uint32 opcode = 1; // pattern used by PUS, F Prime and cFS
-  bytes args = 2; // encoded as the dictionary says; empty if it takes none
 }
 
 message Reboot {}

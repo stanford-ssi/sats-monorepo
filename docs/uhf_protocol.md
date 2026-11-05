@@ -10,7 +10,7 @@ Schemas live in [`proto/`](../proto):
 | [`uhf_packet.proto`](../proto/uhf_packet.proto) | Envelope: `Packet`, `Header`, `Request`, `Response`, `ResultCode`, `NodeAddress` |
 | [`sats_command.proto`](../proto/sats_command.proto) | Memory access: `SatCmd` / `SatResponse` (unchanged) |
 | [`uhf_file.proto`](../proto/uhf_file.proto) | Files: GET, PUT, HEAD, LIST, DELETE on paths |
-| [`uhf_command.proto`](../proto/uhf_command.proto) | Commands: fixed Reboot, TransmitOff, TransmitOn; build-defined opcode + args |
+| [`uhf_command.proto`](../proto/uhf_command.proto) | Commands: Reboot, TransmitOff, TransmitOn |
 | [`uhf_beacon.proto`](../proto/uhf_beacon.proto) | Beacon |
 
 `uhf_packet.proto` imports the others. It is the router: the one place that
@@ -52,7 +52,7 @@ Five mechanisms, each with a clear boundary. The test that sorts most cases:
 | Mechanism | Why we need it | Started by | Safe to repeat | Size |
 |---|---|---|---|---|
 | **Memory** (`SatCmd`) | Most flexible, and the standard approach: any slate value (parameters, flags, current state) can be read or set without new protocol | Ground | Yes | ≤ 1 packet |
-| **Files** | Data bigger than a packet or kept in flash (logs, a slate snapshot, config, later firmware) needs reliable multi-packet transfer | Ground | Yes | any |
+| **Files** | Data bigger than a packet or kept in flash (logs, config, later firmware) needs reliable multi-packet transfer | Ground | Yes | any |
 | **Commands** | Actions with side effects that are not safe to repeat, and recovery that must work even when memory access does not | Ground | No | 1 packet |
 | **Ping** | The cheapest "are you there?", with no dependency on the build or the slate | Ground | Yes | tiny |
 | **Beacon** | The only thing that reaches the ground unprompted, so it works when the uplink is down or no session is running | Satellite, periodically | n/a | 1 packet |
@@ -115,9 +115,8 @@ satellite transmit; the satellite counts it in `Beacon.requests_rejected`.
 2. **Check the sender.** Drop a packet whose `from` byte names the receiver.
 3. **Check for replays** (see below), then record the request id as accepted.
 4. **Decode.** A packet that does not decode gets `RESULT_CODE_BAD_REQUEST`.
-5. **Check the build.** Memory access and custom commands need `Header.build_id`
-   to match, or get `RESULT_CODE_WRONG_BUILD`. Ping, files and fixed commands
-   skip this check.
+5. **Check the build.** Memory access needs `Header.build_id` to match, or gets
+   `RESULT_CODE_WRONG_BUILD`. Ping, files and commands skip this check.
 6. **Dispatch.** No operation set, or one this firmware does not know, gets
    `RESULT_CODE_UNSUPPORTED`. This is what makes every later addition safe.
 
@@ -153,7 +152,7 @@ that sender in this boot. A recorded packet fails one or the other. Gaps from
 lost packets are fine, and the id sequence restarts with each boot count.
 
 The ground also rejects downlinks whose `boot_count` is lower than the latest
-it has seen, and beacons whose `sat_time_ms` goes backwards within a boot.
+it has seen, and beacons whose `onboard_clock_ms` or `time_since_boot_s` goes backwards within a boot.
 
 If the satellite goes quiet (after `transmit_off`, or a transmitter fault), the
 ground can still command it with the last boot count it knows, trying the next
@@ -173,13 +172,12 @@ no answer.
 |---|---|
 | Download | `list` the directory, `get` the file, re-`get` any gaps, then optionally `head` and compare the CRC |
 | Upload | `delete` if replacing, `put` the chunks, then `head` and compare size and CRC |
-| Slate | Compare `Beacon.slate_crc` with the last download; if it differs, `get /sys/slate`, served from a snapshot taken when the request arrives |
 
 ## 7. Response to the FTP/VFS design proposal
 
 This protocol builds on the FTP/VFS design proposal (TM-000001): a symmetric
-protocol, file transfer for logs, and paths that name virtual files as well as
-real ones (`/sys/slate`). It departs from the proposal in two places.
+protocol, and file transfer for logs. It departs from the proposal in two
+places.
 
 ### Stateless paths instead of open and close
 
@@ -217,19 +215,16 @@ Each can be added without editing what exists.
 - Read-only slate fields.
 - Rename (`move`), so an upload can be checked before it replaces a file.
 - Time-tagged commands ("do X at time T").
+- Custom commands defined by a firmware build (an opcode plus arguments from
+  the build's command dictionary), once one has a concrete need.
+- Adding a limit to GET size over FTP.
 
 ## 9. Open questions
 
-- **What does `slate_crc` cover?** The slate includes live telemetry, so a CRC
-  over all of it changes every tick and cannot answer "did anything change".
-  It probably needs to cover only configuration fields, or a defined region.
 - **Chunk limit per GET.** A starting value, and whether it is in packets or
   bytes.
 - **TransmitOff policy.** SAMWISE required the command three times in a row and
   limited silence to three months. Whether we keep either rule, now that
   uplinks are authenticated, is a firmware decision to record here.
-- **Command dictionary format.** What the build emits (JSON, a protobuf
-  descriptor set, ...) and how build-defined args are encoded. Encoding them as
-  protobuf messages described in the dictionary would keep one toolchain.
 - **nanopb sizes.** `string`, `bytes` and `repeated` fields need maximum sizes
   in `.options` files for static allocation on the satellite.
