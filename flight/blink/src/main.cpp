@@ -52,6 +52,9 @@ int main()
             }
         }
 
+        /* Sum of a + b as a hitl example */
+        gSlate.c = gSlate.a + gSlate.b;
+
         /* Blink on a gate rather than a sleep, so the loop keeps servicing
            commands between edges. gSlate.sleep_ms is read fresh each pass,
            so a new rate from the ground takes effect immediately. */

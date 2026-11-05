@@ -24,6 +24,7 @@ dev = [
     "arda",
     "clang-format==18.1.8",
     "satcmd",
+    "marimo>=0.25.2",
 ]
 
 [tool.uv.sources]
