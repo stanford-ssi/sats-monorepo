@@ -64,11 +64,35 @@ class Quaternion:
         )
 
 
+# Calculations done via formulae in Markley
 def test_axis_angle_rotation_is_passive() -> None:
+    # active rotation is 90degrees around z-axis
+    # passive rotation is -90 degrees around z-axis
+    # quaternion will be [0 0 sin(-pi/4) cos(pi/4)]
     frame1_to_frame2 = Quaternion.from_axis_angle(
         np.array([0.0, 0.0, 1.0]), np.pi / 2.0
     )
 
+    np.testing.assert_allclose(
+        frame1_to_frame2.xyzw,
+        np.array([0.0, 0.0, np.sin(-np.pi / 4), np.cos(-np.pi / 4.0)]),
+        atol=1e-12,
+    )
+
+    # given a constant angular velocity of 1 radian per second about the z-axis
+    # quaternon derivative should be [0 0 0.5*1*sqrt(2)/2  0.5*1*sqrt(2)/2]
+    angular_velocity_frame2_wrt_frame1_frame1_rad_per_s = np.array([0.0, 0.0, 1])
+
+    np.testing.assert_allclose(
+        frame1_to_frame2.derivative(
+            angular_velocity_frame2_wrt_frame1_frame1_rad_per_s
+        ),
+        -1 * np.array([0, 0, 0.5 * 1 * np.sqrt(2) / 2, 0.5 * 1 * np.sqrt(2) / 2]),
+        atol=1e-12,
+    )
+
+    # a 90-deg passive rotation sends x-axis to -y-axis
+    # so the DCM should map [1, 0, 0] to [0, -1, 0]
     np.testing.assert_allclose(
         frame1_to_frame2.as_dcm() @ np.array([1.0, 0.0, 0.0]),
         [0.0, -1.0, 0.0],
