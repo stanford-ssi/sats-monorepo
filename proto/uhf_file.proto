@@ -1,8 +1,7 @@
 syntax = "proto3";
 
 /**
- * File Transfer Protocol on UHF. Paths name both files in flash ("/logs/42")
- * and virtual files the firmware produces on demand ("/sys/slate").
+ * File Transfer Protocol on UHF. Paths name files in flash, e.g. "/logs/42".
  */
 
 package sats.uhf;
