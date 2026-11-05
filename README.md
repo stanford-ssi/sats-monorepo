@@ -1,13 +1,27 @@
 # SSI Sats Monorepo
 
 Flight software, ground tooling and sims for SSI's cubesat, in one Bazel
-workspace. The firmware targets an RP2350 (pico 2).
+workspace. The firmware targets an RP2350, on either a Pico 2 dev board or
+the PiCubed flight board.
 
 ## How to build an app
 
 ```bash
-bazel build --config=pico //:blink
+bazel build --config=pico //:blink     # Raspberry Pi Pico 2
+bazel build --config=picubed //:blink  # PiCubed
 ```
+
+Every build is for a board. Each board is a bazel platform in
+`platforms/boards/` that inherits its chip platform from
+`platforms/chips/` and adds its own flags (e.g. the pico-sdk `PICO_BOARD`).
+Building firmware for a bare chip, or for the host, is rejected as
+incompatible.
+
+To add a board, add a `constraint_value` and a `platform` with the chip as
+`parents` in `platforms/boards/BUILD.bazel`, then a `build:<board>` config in
+`.bazelrc` that sets `--platforms` and pulls in the chip's `_<chip>` config.
+A new chip gets a platform in `platforms/chips/BUILD.bazel` and its own
+`build:_<chip>` block.
 
 The uf2 and the elf both land in `bazel-bin/`, as `blink.uf2` and `blink`.
 
@@ -131,8 +145,9 @@ commit stops so you can review and stage the fixes before committing again.
 ## Run the CI checks locally
 
 ``` bash
-bazel test //test:example_test --test_output=errors
+bazel test //... --test_output=errors
 bazel build --config=pico //:blink
+bazel build --config=picubed //:blink
 ```
 
 ## Other scripts

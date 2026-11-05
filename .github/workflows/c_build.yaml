@@ -31,8 +31,12 @@ jobs:
         run: uv run --locked pytest -v
 
   firmware-build:
-    name: RP2350 firmware
+    name: Firmware (${{ matrix.board }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [pico, picubed]
     steps:
       - uses: actions/checkout@v4
 
@@ -44,4 +48,4 @@ jobs:
           repository-cache: true
 
       - name: Build firmware
-        run: bazel build --config=pico //:blink
+        run: bazel build --config=${{ matrix.board }} //:blink

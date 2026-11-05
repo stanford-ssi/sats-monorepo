@@ -1,0 +1,30 @@
+"""
+Chip platforms.
+
+A chip platform describes the silicon: cpu, os and the sdk it builds against.
+It is abstract and never built for directly; boards in //platforms/boards
+name a chip as their parent and add board-specific options on top.
+"""
+
+package(default_visibility = ["//visibility:public"])
+
+constraint_setting(name = "chip")
+
+# Lets chip-level code (e.g. //hal) declare which chip it runs on.
+constraint_value(
+    name = "rp2350_chip",
+    constraint_setting = ":chip",
+)
+
+platform(
+    name = "rp2350",
+    constraint_values = [
+        ":rp2350_chip",
+        "@platforms//cpu:armv8-m",
+        "@platforms//os:none",
+        "@pico-sdk//bazel/constraint:rp2350",
+    ],
+    flags = [
+        "--@pico-sdk//bazel/config:PICO_STDIO_USB=True",
+    ],
+)
