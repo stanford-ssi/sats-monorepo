@@ -15,7 +15,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 # Formatting
 # ============================================================================
 
-# `bazel run //:format` to rewrite, `-- --check` to verify.
+# `bazelisk run //:format` to rewrite, `-- --check` to verify.
 sh_binary(
     name = "format",
     srcs = ["tools/format.sh"],

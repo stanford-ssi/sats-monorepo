@@ -19,7 +19,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
 
-      # The same script as `bazel run //:format -- --check`, so there is
+      # The same script as `bazelisk run //:format -- --check`, so there is
       # one definition of formatted rather than one here and one locally.
       - name: Check formatting
         run: ./tools/format.sh --check

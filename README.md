@@ -6,7 +6,7 @@ workspace. The firmware targets an RP2350 (pico 2).
 ## How to build an app
 
 ```bash
-bazel build --config=pico //:blink
+bazelisk build --config=pico //:blink
 ```
 
 The uf2 and the elf both land in `bazel-bin/`, as `blink.uf2` and `blink`.
@@ -109,15 +109,15 @@ offset comes back as `BAD_OFFSET` rather than corrupting memory.
 ## How to run the tests
 
 ``` bash
-bazel test //...     # firmware and host c++
+bazelisk test //...     # firmware and host c++
 uv run pytest        # ground tooling
 ```
 
 ## Formatting
 
 ``` bash
-bazel run //:format            # rewrite c++ with clang-format, python with ruff
-bazel run //:format -- --check # verify only, what CI runs
+bazelisk run //:format            # rewrite c++ with clang-format, python with ruff
+bazelisk run //:format -- --check # verify only, what CI runs
 uv run pre-commit install      # install the repository's git commit hooks
 ```
 
@@ -131,8 +131,8 @@ commit stops so you can review and stage the fixes before committing again.
 ## Run the CI checks locally
 
 ``` bash
-bazel test //test:example_test --test_output=errors
-bazel build --config=pico //:blink
+bazelisk test //test:example_test --test_output=errors
+bazelisk build --config=pico //:blink
 ```
 
 ## Other scripts

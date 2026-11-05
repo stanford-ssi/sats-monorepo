@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Formats every language in the repo.
 #
-#   bazel run //:format            rewrite files in place
-#   bazel run //:format -- --check verify only, changing nothing
+#   bazelisk run //:format            rewrite files in place
+#   bazelisk run //:format -- --check verify only, changing nothing
 #
 # CI runs this same script with --check, so there is one definition of
 # what "formatted" means rather than one here and another in the workflow.
 set -euo pipefail
 
-# `bazel run` starts us in a runfiles tree, not the sources. It points
+# `bazelisk run` starts us in a runfiles tree, not the sources. It points
 # BUILD_WORKSPACE_DIRECTORY at the real workspace; fall back to git so the
 # script also works when invoked directly.
 cd "${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel)}"

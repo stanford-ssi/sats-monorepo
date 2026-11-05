@@ -296,7 +296,7 @@ int main() {
 Run:
 
 ```bash
-bazel build :ssi-onboarding-26 --config=pico
+bazelisk build :ssi-onboarding-26 --config=pico
 ```
 
 Which should generate a bunch of folders, including most importantly `bazel-bin/ssi-onboarding-26.uf2`, which is the actual binary! This is essentially the same command for the monorepo, except we use a different target name and various configurations, as explained briefly above (`.bazelrc`).
