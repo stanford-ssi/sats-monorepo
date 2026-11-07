@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+/**
+ * Commands: actions that should not be expressed as memory writes.
+ *
+ * Commands answer with a result code only, sent before the action takes
+ * effect. A variant this firmware does not know is answered with
+ * RESULT_CODE_UNSUPPORTED.
+ */
+
+package sats.uhf;
+
+message Command {
+  oneof cmd {
+    Reboot reboot = 1;
+    TransmitOff transmit_off = 2;
+    TransmitOn transmit_on = 3;
+  }
+}
+
+message Reboot {}
+
+message TransmitOff {
+  uint32 duration_s = 1; // 0 = the firmware's maximum
+}
+
+message TransmitOn {}
