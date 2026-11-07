@@ -27,8 +27,7 @@ cc_library(
     deps = [
         "//common/cobs",
         "//common/util",
-        "//common/cmd_receiver",
-        "//common/cmd_responder",
+        "//common/sat_link",
         "//common/slate",
     ]
 )

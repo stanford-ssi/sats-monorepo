@@ -63,36 +63,70 @@ picotool info -a -f
 
 ## How to command a running board
 
-The slate is the flight software's state struct. `satui.py` reads its field
-offsets out of the elf's DWARF debug info, so the offsets always match the
-binary you actually flashed, and talks to the board over usb cdc.
+The slate is the flight software's state struct. The `satcmd` python
+package (in `ground/`) reads its field offsets and types out of the elf's
+DWARF debug info, so they always match the binary you actually flashed, and
+talks to the board over usb cdc.
 
-``` bash
-uv run scripts/satui.py            # the ui, port autodetected
-uv run scripts/satui.py --list     # print the fields and exit
-uv run scripts/satui.py --fake     # run against an in process fake board
-uv run scripts/satui.py --set sleep_ms=500 --set board_power.voltage=3.3
+### From a script
+
+``` python
+import satcmd
+
+with satcmd.connect() as sat:          # port autodetected, elf is bazel-bin/blink
+    sat.sleep_ms = 500                 # a write the board confirms
+    assert sat.sleep_ms == 500         # a fresh read from the board
+    assert sat.led_enabled
+    print(sat.board_power.voltage)     # nested structs are attribute chains
+    print(sat["board_power.current"])  # or dotted names
+    print(sat.dump())                  # every field, by name
 ```
 
-The ui draws in the last few lines of the terminal rather than taking the
-screen over, so whatever you were looking at stays put and the last frame
-is left behind when you quit, like any other command's output:
+`connect(port, elf=..., struct="Slate", fake=False, timeout=0.3)`. With
+`fake=True` an in process board serves a zeroed slate, which is enough to
+try a script out with nothing plugged in. A misspelt field raises
+`AttributeError` with a suggestion rather than silently doing nothing, a
+value that does not fit the field raises `ValueError` before anything is
+sent, and a refused or unanswered request raises `satcmd.BadAddress`,
+`satcmd.BadWidth` or `satcmd.Timeout`.
+
+float32 fields read back as the shortest decimal that is exactly that
+float32, so `sat.temperature = 36.6` reads back as `36.6` rather than
+`36.59999847`, and `==` does what you would expect.
+
+### Interactively
+
+``` bash
+uv run satcmd                      # the browser, port autodetected
+uv run satcmd --fake               # the same, against an in process board
+uv run satcmd list                 # print the fields and exit
+uv run satcmd read [FIELD...]      # print fields (all by default)
+uv run satcmd write sleep_ms=500 board_power.voltage=3.3
+uv run satcmd -v read sleep_ms     # log every frame on the wire
+```
+
+The browser draws in the last few lines of the terminal rather than taking
+the screen over, so whatever you were looking at stays put and the last
+frame is left behind when you quit, like any other command's output:
 
 ```
 ╭─ Slate ──────────────────────────────────── /dev/ttyACM0 ─╮
 │   field                offset  type                 value │
-│ › sleep_ms                  0  uint32                 250 │
-│   temperature               4  float                 36.5 │
-│   board_power.voltage       8  float                  3.3 │
-│   board_power.current      12  float                 0.75 │
+│ › sleep_ms                  0  uint32_t               750 │
+│   cycle_counter             4  uint32_t                 0 │
+│   signed_scratch            8  int                      0 │
+│   temperature              12  float                 36.6 │
+│   board_power.voltage      16  float                  3.3 │
+│   board_power.current      20  float                    0 │
+│   led_enabled              24  bool                  true │
 ╰───────────────────────────────────────────────────────────╯
-  sleep_ms <- 250
+  sleep_ms <- 750
   w write · r refresh · a auto · j/k move · g/G ends · q quit
 ```
 
 Every value shown is read back from the board rather than remembered
 locally, so a refused write is visibly different from one that landed;
-`BAD_OFFSET` and friends show up in the value column in red.
+`BadAddress` and friends show up in the value column in red.
 
 | key | |
 |---|---|
@@ -109,16 +143,38 @@ Colour and box drawing are dropped automatically when stdout is not a
 terminal, and `NO_COLOR` is honoured. Talking to the board needs
 membership in the `dialout` group.
 
-### The command protocol
+### The protocol
 
-`proto/sats_command.proto` is the contract. A `SatCmd` is a oneof over
-`WriteU8` / `WriteU16` / `WriteU32` / `WriteF32` / `ReadField`, each
-addressing a slate field by byte offset. The board answers every command
-with a `SatResponse` carrying a status and the value that actually landed.
-Messages are nanopb encoded and cobs framed, one zero byte per frame.
+`proto/sats_command.proto` is the contract. There is one message, `SatMsg`:
 
-Writes are bounds and alignment checked against `sizeof(Slate)`, so a bad
-offset comes back as `BAD_OFFSET` rather than corrupting memory.
+| field | |
+|---|---|
+| `type` | 1 byte. `SatMsgType`: `READ`, `WRITE`, `READ_RESPONSE` or `WRITE_RESPONSE` |
+| `width` | 1 byte. `Width`: `WIDTH_1_BYTE`, `_2_BYTES` or `_4_BYTES`; each value is its own byte count |
+| `status` | 1 byte. Responses only: `OK`, `BAD_ADDRESS` or `BAD_WIDTH` |
+| `offset` | `uint32`, byte offset into the answering node's memory |
+| `value` | `uint32`, the raw bytes, little endian, in the low `width` bytes |
+
+The three enums are stored as `uint8_t` on the c++ side
+(`proto/sats_command.options`), and nanopb refuses a frame whose value does
+not fit rather than truncating it. A value tops out at 32 bits because that
+is the widest load or store the m33 makes in one instruction, so no read can
+see a field half updated; 64 bit slate fields are listed as skipped.
+
+It is symmetric: either end of a link can send requests and either can
+answer them, so the same message works ground to flight or between two
+microcontrollers. Responses echo `offset` and `width` so they can be
+matched to their request, and carry what memory holds afterwards, so a
+write is confirmed rather than assumed. Messages are nanopb encoded and
+cobs framed, one zero byte per frame.
+
+There are no types on the wire. The answering side copies bytes and
+nothing else; what they mean (signed, float, bool) is known only to the
+requester, which for the ground is the elf's debug info. On the c++ side
+that is `SatLink` (`common/sat_link`, framing in both directions) and
+`SlateServer` (`common/slate`, answers requests with a bounds and alignment
+checked memcpy). Their python twins are `satcmd.Link` and
+`satcmd.MemoryServer`.
 
 ## How to run the tests
 
@@ -153,5 +209,5 @@ bazelisk build --config=picubed //:blink
 ## Other scripts
 
 ``` bash
-uv run scripts/parse_slate.py bazel-bin/blink Slate --flat
+uv run satcmd --elf path/to/elf --struct OtherStruct list   # any struct's layout
 ```

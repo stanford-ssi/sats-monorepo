@@ -10,9 +10,8 @@
 
 #include "proto/sats_command.pb.h"
 
-#include "common/cmd_receiver/cmd_receiver.hpp"
-#include "common/cmd_responder/cmd_responder.hpp"
-#include "common/slate/slate_writer.hpp"
+#include "common/sat_link/sat_link.hpp"
+#include "common/slate/slate_server.hpp"
 
 #include "hal/usb_queue.hpp"
 #include "hal/gpio.hpp"
@@ -35,21 +34,26 @@ int main()
     led_gpio.set_function(GpioFunction::Output);
 
     UsbQueue q{};
-    CmdReceiver recv{q};
-    CmdResponder responder{q};
-    SlateWriter<Slate> writer{gSlate};
+    SatLink<SatMsg, SatMsg> link{q, q};
+    SlateServer<Slate> server{gSlate};
 
     Interval blink{};
     bool led_on = false;
 
     while (true) {
-        recv.update();
+        link.update();
 
-        /* Drain every command that arrived; the receiver only holds 8, so
-           taking one per pass would quietly drop the rest of a burst. */
-        while (std::optional<SatCmd> cmd = recv.get_cmd()) {
-            responder.send(writer.apply(*cmd));
+        /* Drain every message that arrived; the link only holds 8, so
+           taking one per pass would quietly drop the rest of a burst.
+           Responses get no reply; this board sends no requests of its own. */
+        while (std::optional<SatMsg> msg = link.receive()) {
+            if (std::optional<SatMsg> rsp = server.handle(*msg)) {
+                link.send(*rsp);
+            }
         }
+
+        /* Sum of a + b as a hitl example */
+        gSlate.c = gSlate.a + gSlate.b;
 
         /* Blink on a gate rather than a sleep, so the loop keeps servicing
            commands between edges. gSlate.sleep_ms is read fresh each pass,

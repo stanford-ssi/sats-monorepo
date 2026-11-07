@@ -16,4 +16,10 @@ struct Slate
     float temperature{};
     PowerInfo board_power{};
     bool led_enabled{true};
+
+    /* An end to end check: the loop keeps c = a + b, so the ground can
+       write a and b and confirm the board did the arithmetic. */
+    int32_t a{};
+    int32_t b{};
+    int32_t c{};
 };

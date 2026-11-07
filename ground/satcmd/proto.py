@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-sats_proto.py - python bindings for the frozen proto/sats_command.proto.
+proto.py - python bindings for proto/sats_command.proto.
 
 The bindings are compiled from the .proto itself the first time this module
 is imported, rather than being committed alongside it. The contract is shared
@@ -10,9 +9,6 @@ that is derived from the file on disk cannot drift from the file on disk.
 
 protoc output is cached in a temp dir keyed by a hash of the .proto's
 contents, so the compile only actually runs when the contract changes.
-
-Usage:
-    from sats_proto import SatCmd, SatResponse, Width, Status
 """
 
 import hashlib
@@ -21,7 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-PROTO_PATH = Path(__file__).resolve().parent.parent / "proto" / "sats_command.proto"
+PROTO_PATH = Path(__file__).resolve().parents[2] / "proto" / "sats_command.proto"
 
 
 def _compile_proto(proto: Path) -> Path:
@@ -61,12 +57,17 @@ if not PROTO_PATH.exists():
 
 _pb2 = _load(_compile_proto(PROTO_PATH), "sats_command_pb2")
 
-SatCmd = _pb2.SatCmd
-SatResponse = _pb2.SatResponse
-WriteU8 = _pb2.WriteU8
-WriteU16 = _pb2.WriteU16
-WriteU32 = _pb2.WriteU32
-WriteF32 = _pb2.WriteF32
-ReadField = _pb2.ReadField
+SatMsg = _pb2.SatMsg
+SatMsgType = _pb2.SatMsgType
 Width = _pb2.Width
 Status = _pb2.Status
+
+# The response type that answers each request type.
+RESPONSE_TO = {
+    SatMsgType.SAT_MSG_TYPE_READ: SatMsgType.SAT_MSG_TYPE_READ_RESPONSE,
+    SatMsgType.SAT_MSG_TYPE_WRITE: SatMsgType.SAT_MSG_TYPE_WRITE_RESPONSE,
+}
+
+# Every Width is its own byte count (see the proto), so these are both the
+# enum values and the field sizes they stand for.
+WIDTHS = tuple(sorted(v for v in Width.values() if v != Width.WIDTH_UNSPECIFIED))

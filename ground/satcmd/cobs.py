@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """
 cobs.py - the wire framing shared with the firmware.
 
 Frames are cobs encoded and delimited by a zero byte, so a zero can never
 appear inside a frame and a receiver can always resynchronise on one. This
 is a direct port of common/cobs/cobs.cpp and the streaming decoder in
-common/cmd_receiver/cmd_receiver.cpp; keep the three in step.
+common/sat_link/sat_link.hpp; keep the three in step.
 """
 
 DELIMITER = b"\x00"
@@ -60,7 +59,7 @@ def frame(payload: bytes) -> bytes:
 
 
 class Deframer:
-    """Streaming cobs decoder, a port of CmdReceiver's.
+    """Streaming cobs decoder, a port of SatLink's.
 
     Bytes are fed in as they arrive; complete payloads come back out of
     push(). Frames longer than `max_frame` are dropped whole at the

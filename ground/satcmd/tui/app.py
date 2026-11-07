@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 """
-tui.py - the slate browser.
+app.py - the slate browser.
 
-App is the whole ui as a state machine: keys in, lines out, and a Link for
+App is the whole ui as a state machine: keys in, lines out, and a Sat for
 the round trips. It does no io of its own, which is what makes it testable
 against the fake board. The driver at the bottom only feeds it keystrokes
 and hands its lines to the terminal.
@@ -11,10 +10,11 @@ and hands its lines to the terminal.
 import time
 from dataclasses import dataclass
 
-import term
-import theme as th
-from protocol import Field, format_value, parse_value, read_cmd, write_cmd
-from sats_proto import Status
+from satcmd.layout import Field
+from satcmd.link import SatError, Timeout
+from satcmd.sat import Sat
+from satcmd.tui import term
+from satcmd.tui import theme as th
 
 # Seconds between auto refresh round trips. One field is polled per tick
 # rather than the whole table, so a slow or absent board cannot stall the ui.
@@ -40,20 +40,29 @@ class Row:
     value: str = "-"
     error: bool = False
 
-    def update(self, response) -> None:
-        self.value = format_value(response)
-        self.error = response is None or response.status != Status.STATUS_OK
+    def show(self, value) -> None:
+        self.value, self.error = self.field.format(value), False
+
+    def fail(self, err: SatError) -> None:
+        self.value, self.error = _short(err), True
+
+
+def _short(err: SatError) -> str:
+    """An error as it fits in the value column."""
+    if isinstance(err, Timeout):
+        return "no reply"
+    return type(err).__name__  # BadAddress, BadWidth
 
 
 class App:
     """The ui as a state machine: keys in, lines out, round trips in between."""
 
-    def __init__(self, fields: list, link, theme=None, title="Slate", subtitle=""):
-        self.link = link
+    def __init__(self, sat: Sat, theme=None, subtitle=""):
+        self.sat = sat
         self.theme = theme or th.PLAIN
-        self.title = title
+        self.title = sat.layout.name
         self.subtitle = subtitle
-        self.rows = [Row(f) for f in fields]
+        self.rows = [Row(f) for f in sat.layout.fields]
         self.cursor = 0
         self.mode = "normal"  # "write" and "command" both take a line of input
         self.buffer = ""
@@ -79,7 +88,10 @@ class App:
         self.message = "refreshed"
 
     def refresh_row(self, row: Row) -> None:
-        row.update(self.link.request(read_cmd(row.field)))
+        try:
+            row.show(self.sat.read(row.field.name))
+        except SatError as err:
+            row.fail(err)
 
     def tick(self, now: float) -> bool:
         """Poll one field if auto refresh is due. Returns True if it did."""
@@ -95,16 +107,19 @@ class App:
         """Write typed input to the selected field and show what landed."""
         row = self.row
         try:
-            cmd = write_cmd(row.field, parse_value(text, row.field))
+            landed = self.sat.write(row.field.name, row.field.parse(text))
         except ValueError as err:
             self.message = f"{row.field.name}: {err}"
             return
+        except SatError as err:
+            # Read it straight back, so a rejected write shows the old
+            # value rather than the value that was asked for.
+            self.refresh_row(row)
+            self.message = f"{row.field.name} <- {_short(err)}"
+            return
 
-        response = self.link.request(cmd)
-        # Read it straight back, so a rejected write shows the old value
-        # rather than the value that was asked for.
-        self.refresh_row(row)
-        self.message = f"{row.field.name} <- {format_value(response)}"
+        row.show(landed)
+        self.message = f"{row.field.name} <- {row.value}"
 
     # -- keys ----------------------------------------------------------
 
