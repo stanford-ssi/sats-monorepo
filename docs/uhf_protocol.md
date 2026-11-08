@@ -8,7 +8,7 @@ Schemas live in [`proto/`](../proto):
 | File | Contents |
 |---|---|
 | [`uhf_packet.proto`](../proto/uhf_packet.proto) | Envelope: `Packet`, `Header`, `Request`, `Response`, `ResultCode`, `NodeAddress` |
-| [`sats_command.proto`](../proto/sats_command.proto) | Memory access: `SatCmd` / `SatResponse` (unchanged) |
+| [`sats_command.proto`](../proto/sats_command.proto) | Memory access: `SatMsg` (unchanged) |
 | [`uhf_file.proto`](../proto/uhf_file.proto) | Files: GET, PUT, HEAD, LIST, DELETE on paths |
 | [`uhf_command.proto`](../proto/uhf_command.proto) | Commands: Reboot, TransmitOff, TransmitOn |
 | [`uhf_beacon.proto`](../proto/uhf_beacon.proto) | Beacon |
@@ -51,7 +51,7 @@ Five mechanisms, each with a clear boundary. The test that sorts most cases:
 
 | Mechanism | Why we need it | Started by | Safe to repeat | Size |
 |---|---|---|---|---|
-| **Memory** (`SatCmd`) | Most flexible, and the standard approach: any slate value (parameters, flags, current state) can be read or set without new protocol | Ground | Yes | ≤ 1 packet |
+| **Memory** (`SatMsg`) | Most flexible, and the standard approach: any slate value (parameters, flags, current state) can be read or set without new protocol | Ground | Yes | ≤ 1 packet |
 | **Files** | Data bigger than a packet or kept in flash (logs, config, later firmware) needs reliable multi-packet transfer | Ground | Yes | any |
 | **Commands** | Actions with side effects that are not safe to repeat, and recovery that must work even when memory access does not | Ground | No | 1 packet |
 | **Ping** | The cheapest "are you there?", with no dependency on the build or the slate | Ground | Yes | tiny |
@@ -110,9 +110,11 @@ Satellite and ground process every packet in this order. A packet that fails
 steps 1 to 3 is dropped with no reply, since replying would let anyone make the
 satellite transmit; the satellite counts it in `Beacon.requests_rejected`.
 
-1. **Authenticate.** Verify the HMAC with the key for the packet's direction,
-   using a constant-time comparison (not `memcmp`, which leaks timing).
+1. **Authenticate.** Verify the HMAC with the link key, using a constant-time
+   comparison (not `memcmp`, which leaks timing).
 2. **Check the sender.** Drop a packet whose `from` byte names the receiver.
+   This is mandatory on both sides, and tested: it is the only protection
+   against reflection (see Keys).
 3. **Check for replays** (see below), then record the request id as accepted.
 4. **Decode.** A packet that does not decode gets `RESULT_CODE_BAD_REQUEST`.
 5. **Check the build.** Memory access needs `Header.build_id` to match, or gets
@@ -133,15 +135,18 @@ satellite transmit; the satellite counts it in `Beacon.requests_rejected`.
 
 ### Keys
 
-Each direction has its own key, derived from one master secret, so a packet
-signed for one direction can never be reflected back in the other:
+Both directions share one key. That keeps the firmware simple, but it means a
+packet recorded in one direction still verifies if played back in the other,
+and replay protection would not catch it, since a satellite's own packets
+carry its current boot count. The sender check in step 2 is what stops this:
+the `from` byte is covered by the HMAC, so a reflected packet still names its
+real sender and is dropped. Neither side may skip or loosen that check.
 
-```
-K_up   = HMAC-SHA256(K, "uplink")
-K_down = HMAC-SHA256(K, "downlink")
-```
+Separate keys per direction were considered and dropped: with no encryption,
+their main benefit elsewhere (avoiding nonce reuse) does not apply, and the
+signed `from` byte already gives the same protection.
 
-The master key never goes in git. On the satellite it lives where a filesystem
+The key never goes in git. On the satellite it lives where a filesystem
 reformat cannot erase it; losing it means losing the satellite.
 
 ### Replay protection

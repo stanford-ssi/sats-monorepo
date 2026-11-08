@@ -39,7 +39,7 @@ message Request {
   uint32 id = 1; // strictly increasing over time for the same boot_count
   oneof op {
     Ping ping = 2;
-    SatCmd sat_cmd = 3;
+    SatMsg sat_msg = 3; // a READ or WRITE
     FileRequest file = 4;
     Command command = 5;
   }
@@ -49,7 +49,7 @@ message Response {
   uint32 id = 1; // echoes request id
   ResultCode result = 2;
   oneof body {
-    SatResponse sat_response = 3;
+    SatMsg sat_msg = 3; // the READ_RESPONSE or WRITE_RESPONSE
     FileResponse file = 4;
   }
 }

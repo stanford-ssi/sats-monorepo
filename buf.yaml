@@ -14,3 +14,8 @@ lint:
     - PACKAGE_VERSION_SUFFIX
     - DIRECTORY_SAME_PACKAGE
     - PACKAGE_DEFINED
+  ignore_only:
+    # sats_command.proto makes STATUS_OK the zero value on purpose, so a
+    # response that omits status reads as success.
+    ENUM_ZERO_VALUE_SUFFIX:
+      - proto/sats_command.proto
