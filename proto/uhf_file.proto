@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+/**
+ * File Transfer Protocol on UHF. Paths name files in flash, e.g. "/logs/42".
+ */
+
+package sats.uhf;
+
+message FileRequest {
+  string path = 1;
+  oneof method {
+    FileGet get = 2;
+    FilePut put = 3;
+    FileHead head = 4;
+    FileList list = 5;
+    FileDelete delete = 6;
+  }
+}
+
+message FileGet {
+  uint32 offset = 1; // location in the file
+  uint32 length = 2; // 0 = to end of file
+}
+
+message FilePut {
+  uint32 offset = 1;
+  bytes data = 2;
+}
+
+/* Metadata for one path, like HTTP HEAD or stat. Answered with one FileInfo. */
+message FileHead {}
+
+/* `ls` to understand state of file structure. Answered with FileListing packets. */
+message FileList {}
+
+message FileDelete {}
+
+message FileResponse {
+  oneof body {
+    FileData data = 1;
+    FileInfo info = 2;
+    FileListing listing = 3;
+  }
+}
+
+message FileData {
+  uint32 offset = 1;
+  bytes data = 2;
+  bool last = 3; // final packet of this answer, so the ground can stop waiting
+}
+
+message FileInfo {
+  uint32 size = 1;
+  fixed32 crc32 = 2; // to quickly verify if changes happened to this file; CRC-32/ISO-HDLC, as zlib and Ethernet compute it
+  bool is_dir = 3;
+}
+
+message FileListing {
+  repeated FileEntry entries = 1; // as many as fit in one packet
+  bool last = 2; // final packet of this listing, so the ground can stop waiting
+}
+
+message FileEntry {
+  string name = 1;
+  uint32 size = 2;
+  bool is_dir = 3;
+}

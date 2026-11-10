@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+/**
+ * 433 MHz (UHF) link: the envelope every packet travels in, in both directions.
+ *
+ * On-air layout:
+ *   byte 0   to     NodeAddress, set and filtered by RadioHead
+ *   byte 1   from   NodeAddress
+ *   byte 2   id     RadioHead sequence number, wraps at 256
+ *   byte 3   flags  RadioHead flags
+ *   byte 4+  protobuf-encoded Packet
+ *   last 16  HMAC-SHA256 over every byte before it, truncated to 16 bytes
+ *
+ * The RadioHead bytes and the HMAC are raw so a packet is authenticated before decoding.
+ */
+
+package sats.uhf;
+
+import "proto/sats_command.proto";
+import "proto/uhf_beacon.proto";
+import "proto/uhf_command.proto";
+import "proto/uhf_file.proto";
+
+message Packet {
+  Header header = 1;
+  oneof body {
+    SatMsg sat_msg = 3;
+    Request request = 2;
+    Response response = 3;
+    Beacon beacon = 4; // pushed by the satellite, never requested
+  }
+}
+
+message Header {
+  uint32 boot_count = 1; // boot count increments with every reboot
+  fixed32 build_id = 2; // hash of firmware build; check against before allowing memory access
+}
+
+message Request {
+  uint32 id = 1; // strictly increasing over time for the same boot_count
+  oneof op {
+    Ping ping = 2;
+    FileRequest file = 4;
+    Command command = 5;
+  }
+}
+
+message Response {
+  uint32 id = 1; // echoes request id
+  ResultCode result = 2;
+  oneof body {
+    FileResponse file = 4;
+  }
+}
+
+/* Liveness check. Answered with RESULT_CODE_OK and no body. */
+message Ping {}
+
+/* Standard HTTP-like responses. */
+enum ResultCode {
+  RESULT_CODE_UNSPECIFIED = 0; // never sent; proto3 requires a zero value
+  RESULT_CODE_OK = 1; // 200 OK
+  RESULT_CODE_BAD_REQUEST = 2; // 400 Bad Request: malformed, or required fields missing
+  RESULT_CODE_FORBIDDEN = 3; // 403 Forbidden: e.g. writing a read-only path
+  RESULT_CODE_NOT_FOUND = 4; // 404 Not Found
+  RESULT_CODE_UNSUPPORTED = 5; // 501 Not Implemented: no op this firmware knows
+  RESULT_CODE_INTERNAL = 6; // 500 Internal Server Error
+  RESULT_CODE_WRONG_BUILD = 7; // 412 Precondition Failed: Header.build_id mismatch on a build-dependent request
+  RESULT_CODE_NO_SPACE = 8; // 507 Insufficient Storage: filesystem full
+}
+
+/* Node codes used in RadioHead's to and from bytes. */
+enum NodeAddress {
+  NODE_ADDRESS_UNSPECIFIED = 0;
+  NODE_ADDRESS_SATELLITE = 128;
+  NODE_ADDRESS_GROUND_STATION = 129;
+  NODE_ADDRESS_BROADCAST = 255;
+}
