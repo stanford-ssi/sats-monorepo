@@ -24,6 +24,7 @@ import "proto/uhf_file.proto";
 message Packet {
   Header header = 1;
   oneof body {
+    SatMsg sat_msg = 3;
     Request request = 2;
     Response response = 3;
     Beacon beacon = 4; // pushed by the satellite, never requested
@@ -39,7 +40,6 @@ message Request {
   uint32 id = 1; // strictly increasing over time for the same boot_count
   oneof op {
     Ping ping = 2;
-    SatMsg sat_msg = 3; // a READ or WRITE
     FileRequest file = 4;
     Command command = 5;
   }
@@ -49,7 +49,6 @@ message Response {
   uint32 id = 1; // echoes request id
   ResultCode result = 2;
   oneof body {
-    SatMsg sat_msg = 3; // the READ_RESPONSE or WRITE_RESPONSE
     FileResponse file = 4;
   }
 }

@@ -20,8 +20,11 @@ message Command {
 
 message Reboot {}
 
-message TransmitOff {
+message TransmitOff {}
+
+/*
+ * For regulatory safety you want it to turn off after some time
+ */
+message TransmitOn {
   uint32 duration_s = 1; // 0 = the firmware's maximum
 }
-
-message TransmitOn {}
