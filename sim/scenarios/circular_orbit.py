@@ -7,6 +7,7 @@ from arda.constants import (
     EARTH_EQUATORIAL_RADIUS_M,
     EARTH_GRAVITATIONAL_PARAMETER_M3_PER_S2,
 )
+from arda.observers.pointing import TargetDirectionObserver
 from arda.types import Satellite, Scenario, State
 
 
@@ -32,6 +33,12 @@ def make_scenario() -> Scenario:
         ),
         duration_s=5_550.0,
         step_s=2.0,
+        observers=(
+            TargetDirectionObserver(
+                "stanford",
+                np.array([EARTH_EQUATORIAL_RADIUS_M, 0.0, 0.0]),
+            ),
+        ),
     )
 
 
