@@ -30,12 +30,21 @@ def _gravity_force_eci_n(position_eci_m: FloatArray, mass_kg: float) -> FloatArr
 
 
 def _gravity_gradient_moment_body_nm(
-    _position_eci_m: FloatArray,
-    _quat_eci_to_body: Quaternion,
-    _inertia_body_kgm2: FloatArray,
+    position_eci_m: FloatArray,
+    quat_eci_to_body: Quaternion,
+    inertia_body_kgm2: FloatArray,
 ) -> FloatArray:
-    """Return zero until gravity-gradient dynamics are implemented."""
-    return np.zeros(3)
+    # Return 3 mu / r^3 * (n x I n)
+    # n the unit radial vector in body frame
+    # I = inertia of the satellite in body frame
+    radius_m = np.linalg.norm(position_eci_m)
+    radial_unit_body = quat_eci_to_body.as_dcm() @ (position_eci_m / radius_m)
+    return (
+        3.0
+        * EARTH_GRAVITATIONAL_PARAMETER_M3_PER_S2
+        / radius_m**3
+        * np.cross(radial_unit_body, inertia_body_kgm2 @ radial_unit_body)
+    )
 
 
 def test_gravity_force_moment() -> None:
@@ -50,4 +59,25 @@ def test_gravity_force_moment() -> None:
     force_moment = gravity_force_moment(state, satellite)
 
     assert np.all(force_moment.force_eci_n[:2] < 0.0)
-    np.testing.assert_array_equal(force_moment.moment_body_nm, np.zeros(3))
+    # n = [1, 1, 0] / sqrt(2), so n x I n = [0, 0, (I_yy - I_xx) / 2].
+    radius_m = np.linalg.norm(state.position_eci_m)
+    expected_moment_body_nm = (
+        3.0
+        * EARTH_GRAVITATIONAL_PARAMETER_M3_PER_S2
+        / radius_m**3
+        * np.array([0.0, 0.0, 0.5])
+    )
+    np.testing.assert_allclose(force_moment.moment_body_nm, expected_moment_body_nm)
+
+
+"""Check that gravity_gradient torque vanishes 
+    when satellite is aligned with a principal axis."""
+
+
+def test_gravity_gradient_moment_vanishes_on_principal_axis() -> None:
+    moment_body_nm = _gravity_gradient_moment_body_nm(
+        np.array([7_000_000.0, 0.0, 0.0]),
+        Quaternion.identity(),
+        np.diag([3.0, 2.0, 1.0]),
+    )
+    np.testing.assert_allclose(moment_body_nm, np.zeros(3), atol=1e-20)
