@@ -1,0 +1,39 @@
+load("//platforms/boards:defs.bzl", "REQUIRES_BOARD")
+
+package(default_visibility = ["//visibility:public"])
+
+# Every board, in one library. Which one an image uses is picked in
+# selected_board.hpp from the SATS_BOARD_* macro, which is set from the
+# board platform (//platforms/boards) that --config=pico or
+# --config=picubed selects; the linker drops the boards that are not used.
+cc_library(
+    name = "boards",
+    hdrs = [
+        "board.hpp",
+        "pico/pico_board.hpp",
+        "pico/pins.hpp",
+        "picubed/picubed_board.hpp",
+        "picubed/pins.hpp",
+        "selected_board.hpp",
+    ],
+    srcs = [
+        "pico/pico_board.cpp",
+        "picubed/picubed_board.cpp",
+    ],
+    deps = [
+        "//common/util",
+        "//drivers/burn_wire",
+        "//drivers/driver",
+        "//hal:hal_interfaces",
+        "//hal:raspi_hal_hardware",
+    ],
+    # defines, not local_defines: apps read the macro too, through
+    # selected_board.hpp. No default arm: a board platform without an
+    # entry here is a build error rather than an image with no board.
+    defines = select({
+        "//platforms/boards:pico_board": ["SATS_BOARD_PICO=1"],
+        "//platforms/boards:picubed_board": ["SATS_BOARD_PICUBED=1"],
+        "//platforms/boards:none": [],
+    }),
+    target_compatible_with = REQUIRES_BOARD + ["//platforms/chips:rp2350_chip"],
+)

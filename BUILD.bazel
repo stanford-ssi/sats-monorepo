@@ -40,7 +40,8 @@ cc_library(
     includes = ["flight/blink/src"],
     deps = [
         ":common_lib",
-        "//hal:pico_hal",
+        "//boards",
+        "//hal:raspi_hal",
         "//proto:sats_command_nanopb",
     ]
 )
