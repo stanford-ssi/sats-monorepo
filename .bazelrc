@@ -3,7 +3,7 @@
 # ============================================================================
 
 # Set C/C++ language standards
-build --cxxopt=-std=gnu++2a
+build --cxxopt=-std=gnu++23
 build --conlyopt=-std=gnu2x
 
 # Show detailed build information

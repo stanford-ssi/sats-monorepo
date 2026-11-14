@@ -20,6 +20,9 @@ incompatible.
 To add a board, add a `constraint_value` and a `platform` with the chip as
 `parents` in `platforms/boards/BUILD.bazel`, then a `build:<board>` config in
 `.bazelrc` that sets `--platforms` and pulls in the chip's `_<chip>` config.
+Its C++ side is a `Board` subclass under `boards/<board>/` (see
+`boards/board.hpp`), wired up with a `select` arm in `boards/BUILD.bazel` and
+a case in `boards/board.cpp`.
 A new chip gets a platform in `platforms/chips/BUILD.bazel` and its own
 `build:_<chip>` block.
 
