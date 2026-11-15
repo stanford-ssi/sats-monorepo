@@ -6,6 +6,7 @@
  */
 
 #include <expected>
+#include <string_view>
 
 #include "hal/clock.hpp"
 #include "hal/gpio.hpp"
@@ -21,8 +22,13 @@ class BurnWire final : public Driver
 {
 public:
     BurnWire(DigitalOut &a, DigitalOut &b, DigitalOut &relay, Clock &clock)
-        : Driver("burn_wire"), a_(a), b_(b), relay_(relay), clock_(clock)
+        : a_(a), b_(b), relay_(relay), clock_(clock)
     {}
+
+    std::string_view name() const override
+    {
+        return "burn_wire";
+    }
 
 private:
     std::expected<void, DriverError> do_init() override

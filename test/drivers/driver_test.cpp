@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <expected>
+#include <string_view>
 
 #include "drivers/driver/driver.hpp"
 
@@ -11,7 +12,12 @@ namespace
 class BadDriver final : public Driver
 {
 public:
-    explicit BadDriver(int failures) : Driver("bad"), failures_(failures) {}
+    explicit BadDriver(int failures) : failures_(failures) {}
+
+    std::string_view name() const override
+    {
+        return "bad";
+    }
 
 private:
     std::expected<void, DriverError> do_init() override
@@ -25,6 +31,12 @@ private:
 
     int failures_;
 };
+
+TEST(DriverTest, ReportsName)
+{
+    BadDriver d{0};
+    EXPECT_EQ(d.name(), "bad");
+}
 
 TEST(DriverTest, NotReadyUntilInitSucceeds)
 {

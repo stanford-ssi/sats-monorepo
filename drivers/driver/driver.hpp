@@ -6,7 +6,7 @@
  */
 
 #include <expected>
-#include <string>
+#include <string_view>
 
 #include "drivers/driver/driver_error.hpp"
 
@@ -37,14 +37,13 @@ public:
         return ready_;
     }
 
-    /** Returns the driver's name. */
-    const std::string name() const
-    {
-        return name_;
-    }
+    /**
+     * The driver's name.
+     */
+    virtual std::string_view name() const = 0;
 
 protected:
-    explicit Driver(const std::string name) : name_(name) {}
+    Driver() = default;
 
     /**
      * Can only be destroyed by a subclass, preventing bugs with
@@ -56,6 +55,5 @@ protected:
 private:
     virtual std::expected<void, DriverError> do_init() = 0;
 
-    const std::string name_;
     bool ready_ = false;
 };
