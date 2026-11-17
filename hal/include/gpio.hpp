@@ -1,29 +1,44 @@
 #pragma once
 /**
  * Hal abstraction over GPIO
- * Author: Carson Lauer
- * Date: 12 September 2026
+ * Author: Carson Lauer, Ayush Garg
+ * Date: 31 October 2026
  */
 
-#include <memory>
+/*
+ * To enforce pins being in/out at compile time, we have two classes.
+ * If we have the usecase of switching later, we can modify this architecture
+ * to include a switchable pin.
+ */
 
-enum class GpioFunction
-{
-    Input,
-    Output,
-};
-
-class Gpio
+/**
+ * A writable pin that can be set HIGH or LOW.
+ */
+class DigitalOut
 {
 public:
-    class GpioHardware;
+    DigitalOut() = default;
+    DigitalOut(const DigitalOut &) = delete;
+    DigitalOut &operator=(const DigitalOut &) = delete;
 
-    void set(bool value);
+    virtual void set(bool value) = 0;
 
-    void set_function(GpioFunction func);
+protected:
+    ~DigitalOut() = default;
+};
 
-private:
-    GpioHardware &hardware_;
+/**
+ * A readable pin that can be read HIGH or LOW.
+ */
+class DigitalIn
+{
+public:
+    DigitalIn() = default;
+    DigitalIn(const DigitalIn &) = delete;
+    DigitalIn &operator=(const DigitalIn &) = delete;
 
-    Gpio(GpioHardware &hardware) : hardware_(hardware) {};
+    virtual bool read() const = 0;
+
+protected:
+    ~DigitalIn() = default;
 };

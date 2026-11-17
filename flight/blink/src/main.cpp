@@ -14,8 +14,7 @@
 #include "common/slate/slate_server.hpp"
 
 #include "hal/usb_queue.hpp"
-#include "hal/gpio.hpp"
-#include "hal/pico/pico_gpio.hpp"
+#include "boards/selected_board.hpp"
 #include <optional>
 
 #include "slate.hpp"
@@ -28,10 +27,12 @@ int main()
 
     sleep_ms(1000);
 
-    const uint LED_PIN = PICO_DEFAULT_LED_PIN;
-    Gpio::GpioHardware led_hardware = Gpio::GpioHardware(LED_PIN);
-    Gpio led_gpio = led_hardware.build();
-    led_gpio.set_function(GpioFunction::Output);
+    /* This should only be used after init and through the
+       lifetime of main(), so it's not global like slate. */
+    static SelectedBoard board;
+    board.init();
+
+    DigitalOut *led_gpio = board.led();
 
     UsbQueue q{};
     SatLink<SatMsg, SatMsg> link{q, q};
@@ -63,7 +64,9 @@ int main()
             /* The gate keeps ticking while the led is disabled, so the
                blink resumes in phase rather than wherever it stopped. */
             led_on = gSlate.led_enabled && !led_on;
-            led_gpio.set(led_on);
+            if (led_gpio != nullptr)
+                led_gpio->set(led_on);
+
             if (led_on)
                 gSlate.cycle_counter++;
         }

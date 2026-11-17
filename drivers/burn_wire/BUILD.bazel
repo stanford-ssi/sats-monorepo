@@ -1,0 +1,10 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "burn_wire",
+    hdrs = ["burn_wire.hpp"],
+    deps = [
+        "//drivers/driver",
+        "//hal:hal_interfaces",
+    ],
+)

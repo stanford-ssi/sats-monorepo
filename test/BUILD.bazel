@@ -34,3 +34,14 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "all_unique_test",
+    size = "small",
+    srcs = ["all_unique_test.cpp"],
+    deps = [
+        "//common/util",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)

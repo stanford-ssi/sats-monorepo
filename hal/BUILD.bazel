@@ -1,14 +1,23 @@
 package(default_visibility = ["//visibility:public"])
 
+# Interfaces only, buildable on all platforms.
 cc_library(
-    name = "pico_hal",
+    name = "hal_interfaces",
     hdrs = [
-        "include/usb_queue.hpp",
+        "include/clock.hpp",
         "include/gpio.hpp",
     ],
-    srcs = ["pico/usb_queue.cpp"],
+    strip_include_prefix = "/hal/include",
+    include_prefix = "hal",
+)
+
+cc_library(
+    name = "raspi_hal",
+    hdrs = ["include/usb_queue.hpp"],
+    srcs = ["raspi/usb_queue.cpp"],
     deps = [
-        "//hal:pico_hal_hardware",
+        ":hal_interfaces",
+        "//hal:raspi_hal_hardware",
         "//common/util",
         "@pico-sdk//src/rp2_common/pico_stdlib",
         "@pico-sdk//src/rp2_common/pico_stdio_usb",
@@ -19,12 +28,29 @@ cc_library(
 )
 
 cc_library(
-    name = "pico_hal_hardware",
-    hdrs = ["pico/pico_gpio.hpp"],
-     deps = [
-        "//common/util",
-        "@pico-sdk//src/rp2_common/pico_stdlib",
-        "@pico-sdk//src/rp2_common/pico_stdio_usb",
+    name = "raspi_hal_hardware",
+    hdrs = [
+        "raspi/raspi_clock.hpp",
+        "raspi/raspi_gpio.hpp",
+    ],
+    srcs = [
+        "raspi/raspi_clock.cpp",
+        "raspi/raspi_gpio.cpp",
+    ],
+    deps = [
+        ":hal_interfaces",
+        "@pico-sdk//src/common/pico_time",
+        "@pico-sdk//src/rp2_common/hardware_gpio",
     ],
     target_compatible_with = ["//platforms/chips:rp2350_chip"],
+)
+
+# Fake HAL for tests and simulation.
+cc_library(
+    name = "fake_hal",
+    hdrs = [
+        "fake/fake_clock.hpp",
+        "fake/fake_gpio.hpp",
+    ],
+    deps = [":hal_interfaces"],
 )
