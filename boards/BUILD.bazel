@@ -10,15 +10,9 @@ cc_library(
     name = "boards",
     hdrs = [
         "board.hpp",
-        "pico/pico_board.hpp",
-        "pico/pins.hpp",
-        "picubed/picubed_board.hpp",
-        "picubed/pins.hpp",
+        "pico_board.hpp",
+        "picubed_board.hpp",
         "selected_board.hpp",
-    ],
-    srcs = [
-        "pico/pico_board.cpp",
-        "picubed/picubed_board.cpp",
     ],
     deps = [
         "//common/util",

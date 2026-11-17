@@ -20,9 +20,9 @@
 #endif
 
 #if defined(SATS_BOARD_PICO)
-#include "boards/pico/pico_board.hpp"
+#include "boards/pico_board.hpp"
 using SelectedBoard = PicoBoard;
 #elif defined(SATS_BOARD_PICUBED)
-#include "boards/picubed/picubed_board.hpp"
+#include "boards/picubed_board.hpp"
 using SelectedBoard = PicubedBoard;
 #endif
