@@ -33,7 +33,7 @@ public:
 
 protected:
     State(state_id id, std::span<Task *const> task_list)
-        : _id(id), _task_list(task_list)
+        : id_(id), task_list_(task_list)
     {}
 
     ~State() = default;
