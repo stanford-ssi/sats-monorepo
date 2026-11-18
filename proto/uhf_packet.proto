@@ -24,7 +24,7 @@ import "proto/uhf_file.proto";
 message Packet {
   Header header = 1;
   oneof body {
-    SatMsg sat_msg = 3;
+    SatMsg sat_msg = 5;
     Request request = 2;
     Response response = 3;
     Beacon beacon = 4; // pushed by the satellite, never requested
